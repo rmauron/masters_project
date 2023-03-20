@@ -1,0 +1,7 @@
+Package: masters_project
+Type: Project
+Version: 0.0.1
+Imports:
+    knitr,
+    rmarkdown
+Encoding: UTF-8
