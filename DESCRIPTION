@@ -5,3 +5,5 @@ Imports:
     knitr,
     rmarkdown
 Encoding: UTF-8
+URL: https://github.com/rmauron/masters_project
+BugReports: https://github.com/rmauron/masters_project/issues
