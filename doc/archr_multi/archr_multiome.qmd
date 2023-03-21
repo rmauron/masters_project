@@ -213,6 +213,8 @@ p_multi_frags <- plotGroups(
     addBoxPlot = T
 )
 p_multi_frags
+
+#rm(p_frags, p_multi_frags, p_TSS)
 ```
 
 
