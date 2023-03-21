@@ -386,47 +386,6 @@ plotPDF(p_atac_rna, name = "Confusion-Matrix-scATAC-scRNA", addDOC = FALSE)
 ```
 
 
-## Plot TNSE Embedding
-
-### TSNE-cluster
-
-```{r}
-#addTSNE
-projMulti2 <- addTSNE(projMulti2, reducedDims = "LSI_ATAC", name = "TSNE_ATAC", perplexity = 30, force = TRUE)
-projMulti2 <- addTSNE(projMulti2, reducedDims = "LSI_RNA", name = "TSNE_RNA", perplexity = 30, force = TRUE)
-projMulti2 <- addTSNE(projMulti2, reducedDims = "LSI_Combined", name = "TSNE_Combined", perplexity = 30, force = TRUE)
-```
-
-
-### TSNE-plot
-
-```{r}
-#addEmbedding for TSNE
-p1 <- plotEmbedding(projMulti2, name = "Clusters_Combined", embedding = "TSNE_ATAC", size = 1, labelAsFactors=F, labelMeans=F)
-p2 <- plotEmbedding(projMulti2, name = "Clusters_Combined", embedding = "TSNE_RNA", size = 1, labelAsFactors=F, labelMeans=F)
-p3 <- plotEmbedding(projMulti2, name = "Clusters_Combined", embedding = "TSNE_Combined", size = 1, labelAsFactors=F, labelMeans=F)
-
-p <- lapply(list(p1,p2,p3), function(x){
-  x + guides(color = "none", fill = "none") + 
-    theme_ArchR(baseSize = 6.5) +
-    theme(plot.margin = unit(c(0.1, 0.1, 0.1, 0.1), "cm")) +
-    theme(
-      axis.text.x=element_blank(), 
-      axis.ticks.x=element_blank(), 
-      axis.text.y=element_blank(), 
-      axis.ticks.y=element_blank()
-    )
-})
-
-do.call(cowplot::plot_grid, c(list(ncol = 3),p))
-```
-
-```{r}
-#save plot
-plotPDF(p1, p2, p3, name = "TSNE-scATAC-scRNA-Combined", addDOC = FALSE)
-```
-
-
 ## Embedding by sample & by clusters
 
 ### UMAP-plot
@@ -444,24 +403,6 @@ p2
 ```{r}
 #save plot
 plotPDF(p1, p2, name = "UMAP-Combined-sample-clusters", addDOC = FALSE)
-```
-
-
-### TSNE-plot (point 6.1 in manual)
-
-```{r}
-#plot by sample and by clusters
-p1 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Sample", embedding = "TSNE_Combined")
-p1
-
-p2 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Clusters_Combined", embedding = "TSNE_Combined")
-p2
-```
-
-
-```{r}
-#save plot
-plotPDF(p1, p2, name = "TSNE-Combined-sample-clusters", addDOC = FALSE)
 ```
 
 
@@ -522,46 +463,7 @@ plotPDF(p1, p2, name = "Harmony-Combined-sample-clusters", addDOC = FALSE)
 ```
 
 
-### TSNE
-
-```{r}
-projMulti2 <- addTSNE(
-  ArchRProj = projMulti2,
-  reducedDims = "Harmony",
-  name = "TSNEHarmony",
-  perplexity = 30,
-  force = T
-)
-```
-
-
-### Harmony-TNSE-plot
-
-```{r}
-p1 <- plotEmbedding(ArchRProj = projMulti2, 
-                    colorBy = "cellColData", 
-                    name = "Sample", 
-                    embedding = "TSNEHarmony")
-
-p2 <- plotEmbedding(ArchRProj = projMulti2, 
-                    colorBy = "cellColData", 
-                    name = "Clusters_Combined", 
-                    embedding = "TSNEHarmony")
-
-p1
-p2
-```
-
-```{r}
-#save plot
-plotPDF(p1, p2, name = "Harmony-TNSE-Combined-sample-clusters", addDOC = FALSE)
-```
-
-
-
 ## Gene scores and Marker genes (point 7 in manaul)
-
-Note that since the snRNA-seq is linked, the *Gene score* is replaced by the *Gene expression*.
 
 ### Gene / Marker / motif list:
 
@@ -670,7 +572,6 @@ my_markers <- c(
 )
 
 my_markers <- unique(my_markers)
-    
 ```
 
 
