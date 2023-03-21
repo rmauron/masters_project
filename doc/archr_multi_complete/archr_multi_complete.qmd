@@ -1,0 +1,2824 @@
+---
+title: "ArchR analysis with multiomics data"
+author: "Raphaël Mauron"
+format: 
+  html:
+    code-fold: true
+    toc: true
+    number-sections: true
+    theme: spacelab
+    embed-resources: true
+---
+
+# Pipeline for multiomics analysis
+Meaning that snATAC-seq and snRNA-seq from the same cells are available.
+The cells are likely not labeled.
+
+## Links
+Mainly from: https://github.com/GreenleafLab/ArchR_Website/blob/ui_updates/bookdown/21_MultiomicDataAnalysis.Rmd
+and: https://www.archrproject.com/bookdown/getting-started-with-archr.html
+
+
+Text from the authors:
+"
+This chapter provides an overview of how to analyze multiomic data in ArchR. For clarity, when we say "multiomic data", what we are really talking about is ATAC-seq and RNA-seq acquired from the same single cells using the 10x Genomics platform. Our hope is to eventually generalize the infrastructure and workflows here to arbitrary multiomic data types and platforms but given that the vast majority of use cases focus specifically on the 10x Multiome kit, that is the first implementation we have made.
+
+Importantly, this chapter is not meant to serve as the only thing you read if you are a new ArchR user starting with Multiome data. Instead, you should read the full manual from the start. This chapter really just shows how to work with Multiome data and load it into the ArchR ecosystem. It does not provide details on all of the other capabilities of ArchR and how to properly use them."
+
+
+## Importing data and setting up a Multiome project
+
+First, it is worth noting that the datasets used in this chapter are different from the datasets used in the other chapters and we will be creating a new `ArchRProject` here. For this reason, and to make this chapter a standalone, we will repeat operations from other parts of the manual.
+
+Lets start by loading ArchR and setting up our genome (`hg38` in this case), our threads (which are system dependent so you should change that based on your computational resources), and our random seed.
+
+```{r}
+library(ArchR)
+#addArchRGenome("hg38") #for human
+addArchRGenome("mm10") #for mouse
+addArchRThreads(32) #rocommended 1/2 of total available cores
+set.seed(1)
+```
+
+
+We can download the files associated with the multiome tutorial just like we did for the main tutorial but using `tutorial = "Multiome"`.
+
+```{r}
+#inputFiles <- getTutorialData(tutorial = "Multiome")
+```
+
+
+```{r}
+#when working on server/cluters, need to set the working directory aka the path to your input files:
+#setwd("/Users/raphael.mauron/archr/archr_multiome/multiome_data")
+
+
+#Get Input Fragment Files. Here, input the ATAC-seq data.
+#if multiple files (from experiments, samples, ...) insert as a vector c("sample1", "sample2", "sample3")
+inputFiles <- getInputFiles(c("/Users/raphaelmauron/archr_rr3/data-raw/ATAC/CF1",
+                              "/Users/raphaelmauron/archr_rr3/data-raw/ATAC/CF2",
+                              "/Users/raphaelmauron/archr_rr3/data-raw/ATAC/CF7",
+                              "/Users/raphaelmauron/archr_rr3/data-raw/ATAC/CG8",
+                              "/Users/raphaelmauron/archr_rr3/data-raw/ATAC/CG9"))
+
+
+#insert corresponding name c("name1", "name2", "name3")
+names(inputFiles) <- c("CF1",
+                       "CF2",
+                       "CF7",
+                       "CG8",
+                       "CG9")
+```
+
+
+If we inspect `inputFiles` you can see that we have a `.fragments.tsv.gz` file and a `filtered_feature_bc_matrix.h5` file for each sample. These two files are both standard outputs of the 10x Genomics `cellranger-arc` pipeline.
+
+```{r}
+#check the inputs
+inputFiles
+```
+
+
+The first thing we need to do is separate out the scATAC-seq input files from the scRNA-seq input files. Here, we are doing that using `grep()` but you can also do it manually however you want. The important thing is to end up with a named vector of files corresponding to the scATAC-seq data and a named vector of files corresponding to the scRNA-seq data __and that the names of the corresponding samples match__! 
+
+```{r}
+#If you use the mock dataset from autors, you can split ATAC and RNA files here. If you insert your own data, follow the script.
+
+# atacFiles <- inputFiles[grep(pattern = "\\.fragments.tsv.gz$", x = inputFiles)]
+# rnaFiles <- inputFiles[grep(pattern = "\\.filtered_feature_bc_matrix.h5$", x = inputFiles)]
+```
+
+
+For clarity, the above code is the same as doing this manually:
+
+```{r}
+# atacFiles <- c("pbmc_sorted_3k" = "Multiome/pbmc_sorted_3k.fragments.tsv.gz", "pbmc_unsorted_3k" = "Multiome/pbmc_unsorted_3k.fragments.tsv.gz")
+# rnaFiles <- c("pbmc_sorted_3k" = "Multiome/pbmc_sorted_3k.filtered_feature_bc_matrix.h5", "pbmc_unsorted_3k" = "Multiome/pbmc_unsorted_3k.filtered_feature_bc_matrix.h5")
+```
+
+
+You can see that the names in these vectors match which is what will be used to link the files together upon import.
+
+```{r}
+# names(atacFiles)
+# names(rnaFiles)
+# all.equal(names(atacFiles), names(rnaFiles))
+```
+
+
+## Create Arrow Files & Project
+
+As in the main tutorial, the first step is to create ArrowFiles from the scATAC-seq fragment files.
+
+```{r}
+ArrowFiles <- createArrowFiles(
+  inputFiles = inputFiles, #contains only the ATAC data for now
+  sampleNames = names(inputFiles), #names(atacFiles) #if you use mock dataset
+  minTSS = 4,
+  minFrags = 1000,
+  addTileMat = TRUE,
+  addGeneScoreMat = TRUE
+)
+```
+
+
+Note: At this stage, in the working directory figures a repository containing quality control plot for each sample passed.
+
+Then we create an `ArchRProject` object from those ArrowFiles
+
+```{r}
+projMulti1 <- ArchRProject(ArrowFiles = ArrowFiles)
+```
+
+
+## Importing snRNA-seq
+
+Now that we've handled the scATAC-seq data, we turn out attention to the scRNA-seq data. ArchR provides the `import10xFeatureMatrix()` function which will perform this automatically for all of the `filtered_feature_bc_matrix.h5` files in your data set. While this process may seem straightforward, there are a few things going on under-the-hood which are important to understand. First, the `filtered_feature_bc_matrix.h5` created by `cellranger-arc` are not always perfectly matched across samples. For example, ArchR will throw an error if your various scRNA-seq input files do not match based on the gene names or the metadata columns because we view this as an unforseen incompatibility between data, potentially caused by alignment to different reference genomes or something similar. There are also more permissible mismatches that occur across these input files. Relatively frequently, the transcript-level data that is associated with each gene can vary slightly across samples for reasons that aren't completely clear. For more information, see [this post](https://github.com/GreenleafLab/ArchR/issues/507#issuecomment-1063139673). Because of this, you have to decide what to do when these minor conflicts arise. We provide two options which are controlled by the `strictMatch` parameter. If you want to try to keep the genes with mis-matched metadata information, set `strictMatch = FALSE` which will coerce all samples to match the metadata information of the first sample from your `input`. Alternatively, if you would prefer to remove genes whose metadata is mis-matched across samples, you can set `strictMatch = TRUE` which will remove the offending genes from all samples. This is often a very small number of genes so it is unlikely to affect your analysis either way.
+
+```{r}
+#create an ArchR object containing the RNA data.
+
+#setwd("/Users/raphael.mauron/archr/archr_multiome/multiome_data") #path to data when working on server.
+
+seRNA <- import10xFeatureMatrix(
+  input = c("/Users/raphaelmauron/archr_rr3/data-raw/ATAC/CF1/filtered_feature_bc_matrix.h5",
+            "/Users/raphaelmauron/archr_rr3/data-raw/ATAC/CF2/filtered_feature_bc_matrix.h5",
+            "/Users/raphaelmauron/archr_rr3/data-raw/ATAC/CF7/filtered_feature_bc_matrix.h5",
+            "/Users/raphaelmauron/archr_rr3/data-raw/ATAC/CG8/filtered_feature_bc_matrix.h5",
+            "/Users/raphaelmauron/archr_rr3/data-raw/ATAC/CG9/filtered_feature_bc_matrix.h5"),
+  
+  names = c("CF1",
+            "CF2",
+            "CF7",
+            "CG8",
+            "CG9"),
+  
+  strictMatch = TRUE
+)
+```
+
+
+### QC
+
+```{r}
+nCells_df <- data.frame(sample = projMulti1@cellColData@listData[["Sample"]]@values,
+                        nCells = projMulti1@cellColData@listData[["Sample"]]@lengths)
+nCells_df
+```
+
+
+```{r}
+ggplot(nCells_df,
+       aes(x = sample, y = nCells)) +
+    geom_bar(stat = "identity")
+```
+
+
+```{r}
+cat("Total number of cells among the samples before doublets removal is:", nCells(projMulti1))
+```
+
+
+```{r}
+p_frags <- plotGroups(
+    projMulti1,
+    groupBy = "Sample",
+    colorBy = "cellColData",
+    name = "nFrags",
+    plotAs = "violin",
+    alpha = 0.4,
+    addBoxPlot = T,
+    log = F
+)
+p_frags
+
+p_TSS <- plotGroups(
+    projMulti1,
+    groupBy = "Sample",
+    colorBy = "cellColData",
+    name = "TSSEnrichment",
+    plotAs = "violin",
+    alpha = 0.4,
+    addBoxPlot = T
+)
+p_TSS
+
+p_multi_frags <- plotGroups(
+    projMulti1,
+    groupBy = "Sample",
+    colorBy = "cellColData",
+    name = "nMultiFrags",
+    plotAs = "violin",
+    alpha = 0.4,
+    addBoxPlot = T
+)
+p_multi_frags
+
+#rm(p_frags, p_multi_frags, p_TSS)
+```
+
+
+In this tutorial data, there actually aren't any examples of this transcript-level metadata mismatch. But if there were, ArchR would output warnings to tell you about the genes that were being excluded or coerced. However, what you do see is a warning that some of the features (genes) did not have an "interval" (or genomic location) present in the 10x input file. This is most frequently the case for genes encoded on the mitochondrial DNA but could in theory happen for other genes in other species as well. This causes problems for ArchR because we assume that every gene has a position in the genome. To get around this problem, ArchR will default to assigning these genes a fake genomic position on "chrNA". All of these genes will then get excluded from downstream analyses. If you want to rescue these genes, then you must provide this information via the `features` parameter. This is most easily done using an Ensembl database object from BioConductor. The below code assumes that you have installed the `EnsDb.Hsapiens.v86` package from BioConductor.
+
+```{r}
+# library(EnsDb.Hsapiens.v86)
+# seRNA <- import10xFeatureMatrix(
+#   input = rnaFiles,
+#   names = names(rnaFiles),
+#   strictMatch = TRUE,
+#   features = genes(EnsDb.Hsapiens.v86)
+# )
+```
+
+
+After supplying the genes to the `features` param, you can see that all of the genes encoded on the mitochondrial genome are rescued.
+
+The next thing that we want to do is add this scRNA-seq data to our `ArchRProject` via the `addGeneExpressionMatrix()` function. 
+
+However, there is some tidying up that we need to do before we are ready to do that. Inherent in how the multiomic data is generated, you will likely have cells that pass scRNA-seq quality control but not scATAC-seq quality control and vice versa. This can cause problems downstream with other ArchR functions that expect every cell to have every data type. For example, if you were to add gene expression data for only a subset of cells and then try to perform `addIterativeLSI()` on the corresponding `GeneExpressionMatrix`, ArchR would not know what to do with the cells that were missing data in the `GeneExpressionMatrix`. Because our `ArchRProject` is anchored in the scATAC-seq data, we first check to see how many cells in our project (the ones that have passed scATAC-seq quality control) are not also in our scRNA-seq data
+
+```{r}
+length(which(getCellNames(projMulti1) %ni% colnames(seRNA)))
+```
+
+
+Though not many cells in this case, we need to remove these cells from our project before proceeding. We do this using the `subsetArchRProject()` function and saving this as a new `ArchRProject` called `projMulti2`. Again, this removal isn't explicitly necessary but there are downstream ArchR functions that could break if all cells dont have both data types so the safest thing to do is remove them.
+
+```{r}
+#save project since we will change project now
+saveArchRProject(ArchRProj = projMulti1, outputDirectory = "Save-ProjMulti1", load = F)
+```
+
+
+```{r}
+#load the project from last saved project (if necessary)
+#library(ArchR)
+#projMulti1 <- loadArchRProject(path = "./Save-ProjMulti1", force = FALSE, showLogo = TRUE)
+```
+
+
+```{r}
+cellsToKeep <- which(getCellNames(projMulti1) %in% colnames(seRNA))
+projMulti2 <- subsetArchRProject(
+    ArchRProj = projMulti1, 
+    cells = getCellNames(projMulti1)[cellsToKeep], 
+    outputDirectory = "Save-ProjMulti2", 
+    force = TRUE)
+```
+
+
+Finally, we are ready to add the gene expression data to our project. You'll notice here another parameter called `strictMatch`. When `strictMatch = TRUE`, this will ensure that all cells in the `ArchRProject` are also represented in the `seRNA` object. This is a nice fail-safe to make sure that the above project subsetting went smoothly. If `strictMatch = FALSE` (the default), then this function will merely throw a warning telling you that not all of your cells have scRNA-seq information and that this could cause problems downstream.
+
+```{r}
+#adding the RNA data to the project together with the ATAC data
+projMulti2 <- addGeneExpressionMatrix(input = projMulti2, seRNA = seRNA, strictMatch = TRUE, force = TRUE)
+```
+
+
+## Doublet removal (point 2 in manual)
+
+The last thing that we will do during this project setup phase is filter out any doublets.
+
+```{r}
+projMulti2 <- addDoubletScores(projMulti2, force = TRUE)
+projMulti2 <- filterDoublets(projMulti2)
+```
+
+
+```{r}
+cat("Total number of cells among the samples after doublets removal is:", nCells(projMulti2),". \n")
+
+cat("A total of", nCells(projMulti1)-nCells(projMulti2), "doublets were removed.")
+```
+
+
+## Analysis of multiome data in ArchR
+
+With our multiome project created, we're now ready to start analysis. It is worth mentioning that the analyses below aren't altogether different from the analyses presented in the rest of the full manual. Because of the inclusion of gene scores, ArchR was already performing analyses that leveraged gene-level information and scATAC-seq information. 
+
+The primary difference between ATAC-only analysis and multiomic analysis is that we are using the **`GeneExpressionMatrix`** instead of the **`GeneScoreMatrix`**.
+
+
+### Dimensionality reduction (point 4 in manual)
+
+The first thing we will do is perform dimensionality reduction using `addIterativeLSI()`. We can do this on the scATAC-seq data via the `TileMatrix` and on the scRNA-seq data via the `GeneExpressionMatrix`.
+
+LSI = Latent Semantic Indexing
+
+```{r}
+#LSI ATAC
+projMulti2 <- addIterativeLSI(
+  ArchRProj = projMulti2, 
+  clusterParams = list(
+    resolution = 0.2, 
+    sampleCells = 10000,
+    n.start = 10
+  ),
+  saveIterations = FALSE,
+  useMatrix = "TileMatrix", 
+  depthCol = "nFrags",
+  name = "LSI_ATAC"
+)
+```
+
+
+```{r}
+#LSI RNA
+projMulti2 <- addIterativeLSI(
+  ArchRProj = projMulti2, 
+  clusterParams = list(
+    resolution = 0.2, 
+    sampleCells = 10000,
+    n.start = 10
+  ),
+  saveIterations = FALSE,
+  useMatrix = "GeneExpressionMatrix", 
+  depthCol = "Gex_nUMI",
+  varFeatures = 2500,
+  firstSelection = "variable",
+  binarize = FALSE,
+  name = "LSI_RNA"
+)
+```
+
+
+We can also create a dimensionality reduction that uses information from both the scATAC-seq and scRNA-seq data. We will name this `reducedDims` object "LSI_Combined".
+
+```{r}
+#LSI from both ATAC and RNA
+projMulti2 <- addCombinedDims(projMulti2, reducedDims = c("LSI_ATAC", "LSI_RNA"), name =  "LSI_Combined")
+```
+
+
+### Embedding of reduced dimensions (point 6.1 in manual)
+
+We can create UMAP embeddings for each of these dimensionality reductions.
+
+```{r}
+#generate UMAP from the reduced dimensions performed with LSI
+projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_ATAC", name = "UMAP_ATAC", minDist = 0.8, force = TRUE)
+projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_RNA", name = "UMAP_RNA", minDist = 0.8, force = TRUE)
+projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_Combined", name = "UMAP_Combined", minDist = 0.8, force = TRUE)
+```
+
+
+### Clustering (point 5 from manual)
+**Note that here it doesn't matter whether point 5 or 6 is performed first.**
+
+And then call clusters for each.
+
+```{r}
+projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_ATAC", name = "Clusters_ATAC", resolution = 0.4, force = TRUE)
+projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_RNA", name = "Clusters_RNA", resolution = 0.4, force = TRUE)
+projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_Combined", name = "Clusters_Combined", resolution = 0.4, force = TRUE)
+```
+
+
+### Plot UMAP Embedding
+
+We can plot how each of these dimensionality reductions look with respect to the clusters called in "LSI_Combined".
+It gives an idea of the data obtained from reduced dimension with:
+- ATAC only
+- RNA only
+- ATAC & RNA (hopefully this one gives more compact clusters)
+
+Clusters calculated above are colored.
+
+```{r}
+p1 <- plotEmbedding(projMulti2, name = "Clusters_Combined", embedding = "UMAP_ATAC", size = 1, labelAsFactors=F, labelMeans=F)
+p2 <- plotEmbedding(projMulti2, name = "Clusters_Combined", embedding = "UMAP_RNA", size = 1, labelAsFactors=F, labelMeans=F)
+p3 <- plotEmbedding(projMulti2, name = "Clusters_Combined", embedding = "UMAP_Combined", size = 1, labelAsFactors=F, labelMeans=F)
+
+p <- lapply(list(p1,p2,p3), function(x){
+  x + guides(color = "none", fill = "none") + 
+    theme_ArchR(baseSize = 6.5) +
+    theme(plot.margin = unit(c(0.1, 0.1, 0.1, 0.1), "cm")) +
+    theme(
+      axis.text.x=element_blank(), 
+      axis.ticks.x=element_blank(), 
+      axis.text.y=element_blank(), 
+      axis.ticks.y=element_blank()
+    )
+})
+
+do.call(cowplot::plot_grid, c(list(ncol = 3),p))
+```
+
+
+We can also save this to a PDF file.
+
+```{r}
+#save plot
+plotPDF(p1, p2, p3, name = "UMAP-scATAC-scRNA-Combined", addDOC = FALSE)
+```
+
+
+### Confusion matrix clusters ATAC vs RNA (point 5 in manual)
+
+You'll notice that there are some differences between the cluster residence of cells in the scATAC-seq space and cells in the scRNA-seq space. We can visualize these differences using a confusion matrix.
+
+```{r}
+cM_atac_rna <- confusionMatrix(paste0(projMulti2$Clusters_ATAC), paste0(projMulti2$Clusters_RNA))
+cM_atac_rna <- cM_atac_rna / Matrix::rowSums(cM_atac_rna)
+
+library(pheatmap)
+p_atac_rna <- pheatmap::pheatmap(
+  mat = as.matrix(cM_atac_rna), 
+  color = paletteContinuous("whiteBlue"), 
+  border_color = "black"
+)
+```
+
+
+```{r}
+#save plot
+plotPDF(p_atac_rna, name = "Confusion-Matrix-scATAC-scRNA", addDOC = FALSE)
+```
+
+
+## Plot TNSE Embedding
+
+### TSNE-cluster
+
+```{r}
+#addTSNE
+projMulti2 <- addTSNE(projMulti2, reducedDims = "LSI_ATAC", name = "TSNE_ATAC", perplexity = 30, force = TRUE)
+projMulti2 <- addTSNE(projMulti2, reducedDims = "LSI_RNA", name = "TSNE_RNA", perplexity = 30, force = TRUE)
+projMulti2 <- addTSNE(projMulti2, reducedDims = "LSI_Combined", name = "TSNE_Combined", perplexity = 30, force = TRUE)
+```
+
+
+### TSNE-plot
+
+```{r}
+#addEmbedding for TSNE
+p1 <- plotEmbedding(projMulti2, name = "Clusters_Combined", embedding = "TSNE_ATAC", size = 1, labelAsFactors=F, labelMeans=F)
+p2 <- plotEmbedding(projMulti2, name = "Clusters_Combined", embedding = "TSNE_RNA", size = 1, labelAsFactors=F, labelMeans=F)
+p3 <- plotEmbedding(projMulti2, name = "Clusters_Combined", embedding = "TSNE_Combined", size = 1, labelAsFactors=F, labelMeans=F)
+
+p <- lapply(list(p1,p2,p3), function(x){
+  x + guides(color = "none", fill = "none") + 
+    theme_ArchR(baseSize = 6.5) +
+    theme(plot.margin = unit(c(0.1, 0.1, 0.1, 0.1), "cm")) +
+    theme(
+      axis.text.x=element_blank(), 
+      axis.ticks.x=element_blank(), 
+      axis.text.y=element_blank(), 
+      axis.ticks.y=element_blank()
+    )
+})
+
+do.call(cowplot::plot_grid, c(list(ncol = 3),p))
+```
+
+```{r}
+#save plot
+plotPDF(p1, p2, p3, name = "TSNE-scATAC-scRNA-Combined", addDOC = FALSE)
+```
+
+
+## Embedding by sample & by clusters
+
+### UMAP-plot
+
+```{r}
+#plot by sample and by clusters
+p1 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Sample", embedding = "UMAP_Combined")
+p1
+
+p2 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Clusters_Combined", embedding = "UMAP_Combined")
+p2
+```
+
+
+```{r}
+#save plot
+plotPDF(p1, p2, name = "UMAP-Combined-sample-clusters", addDOC = FALSE)
+```
+
+
+### TSNE-plot (point 6.1 in manual)
+
+```{r}
+#plot by sample and by clusters
+p1 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Sample", embedding = "TSNE_Combined")
+p1
+
+p2 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Clusters_Combined", embedding = "TSNE_Combined")
+p2
+```
+
+
+```{r}
+#save plot
+plotPDF(p1, p2, name = "TSNE-Combined-sample-clusters", addDOC = FALSE)
+```
+
+
+## HARMONY: Batch effect correction (point 4.4 in manual)
+
+Helps for more dense clusters
+(Not the same as LSI)
+
+```{r}
+#Harmony 
+projMulti2 <- addHarmony(
+  ArchRProj = projMulti2,
+  reducedDims = "LSI_Combined",
+  name = "Harmony",
+  groupBy = "Sample",
+  force = T
+)
+```
+
+
+## Dimensionality reduction after Harmony (point 6.3 in manual)
+
+### UMAP
+
+```{r}
+#dimensionality reduction (Harmony, not LSI)
+projMulti2 <- addUMAP(
+  ArchRProj = projMulti2,
+  reducedDims = "Harmony",
+  name = "UMAPHarmony",
+  nNeighbors = 30,
+  minDist = 0.5,
+  metric = "cosine",
+  force = T
+)
+```
+
+### Harmony-UMAP-plot
+
+```{r}
+p1 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Sample", 
+                    embedding = "UMAPHarmony")
+
+p2 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Clusters_Combined", 
+                    embedding = "UMAPHarmony")
+
+p1
+p2
+```
+
+```{r}
+#save plot
+plotPDF(p1, p2, name = "Harmony-Combined-sample-clusters", addDOC = FALSE)
+```
+
+
+### TSNE
+
+```{r}
+projMulti2 <- addTSNE(
+  ArchRProj = projMulti2,
+  reducedDims = "Harmony",
+  name = "TSNEHarmony",
+  perplexity = 30,
+  force = T
+)
+```
+
+
+### Harmony-TNSE-plot
+
+```{r}
+p1 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Sample", 
+                    embedding = "TSNEHarmony")
+
+p2 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Clusters_Combined", 
+                    embedding = "TSNEHarmony")
+
+p1
+p2
+```
+
+```{r}
+#save plot
+plotPDF(p1, p2, name = "Harmony-TNSE-Combined-sample-clusters", addDOC = FALSE)
+```
+
+
+
+## Gene scores and Marker genes (point 7 in manaul)
+
+Note that since the snRNA-seq is linked, the *Gene score* is replaced by the *Gene expression*.
+
+### Gene / Marker / motif list:
+
+```{r}
+#include your marker gene list here
+#specific list of gene to label
+
+my_markers <- c(
+    "Kcnd2", 
+    "Olfm3",
+    "Tenm1",
+    "Zfp36l2", 
+    "Pacrg", 
+    "Rnf220", 
+    "Zbtb16",
+    "Cbln1", 
+    "Neurod1",
+    "Il1rl2", 
+    "Cldn11", 
+    "Cyp27a1", 
+    "E330020D12Rik", 
+    "Tfap2b",
+    "Wfs1",
+    "Dkk3",
+    "Prox1",
+    "Egfr",
+    "Ptn",
+    "Efna5",
+    "Vegfa",
+    "Zic1",
+    "Zic2",
+    "Atoh1",
+    "Sox2",
+    "Nr4a2",
+    "Pparg",
+    "Rxra",
+    "Nr2f6",
+    "Hic1",
+    "Sox6",
+    "Gfap",
+    "Ppp1r17",
+    "Eomes",
+    "Neurod2",
+    "Dlx2",
+    "Hes1",
+    "Limch1",
+    "Runx1",
+    "Sncb",
+    "Dok5",
+    "Jun",
+    "Fos",
+    "Klf16",
+    "Sp1",
+    "Sp2",
+    "Ascl1",
+    "Mef2c",
+    "C9orf72",
+    "Pax6",
+    "Top2a",
+    "Vim",
+    "Sox9",
+    "Igfbp7",
+    "Aqp4",
+    "Fezf2",
+    "Nfib",
+    "Lhx6",
+    "Gad1",
+    "Neurod6",
+    "Syt1",
+    "Cntn2",
+    "Pcdh20",
+    "Myt1l",
+    "Plxnd1",
+    "Camk2b",
+    "Shank2",
+    "Ncam1",
+    "Ccnd1",
+    "Otx2",
+    "Agt",
+    "Apoe",
+    #Neurodegenerative disease marker
+    
+"CD33",
+"PSEN1",
+"PSEN2",
+"TREM2",
+"GBA",
+"LRRK2",
+"PINK1",
+"UCHL1",
+"VPS35",
+"C9orf72",
+"FUS",
+"SOD1",
+"SQSTM1",
+
+
+"TYROBP",
+"P2RY12",
+"CX3CR1",
+"TMEM119",
+
+"Axl",
+"CST7",
+"Spp1"
+)
+
+my_markers <- unique(my_markers)
+    
+```
+
+
+### Tweak and bias correction for multiome data
+
+There are, of course, some aspects of the analysis which you should tweak when using *multiome data*. One such example is the `bias` argument to `getMarkerFeatures()` which can be tweaked to account for both scATAC-seq data quality (`"TSSEnrichment`) and read depth for both assays (`"log10(nFrags)"` for scATAC-seq and `"log10(Gex_nUMI)"` for scRNA-seq).
+
+```{r}
+#bias correction
+se <- getMarkerFeatures(ArchRProj = projMulti2,
+                        groupBy = "Clusters_Combined",
+                        bias = c("TSSEnrichment", #snATAC-seq data quality
+                                 "log10(nFrags)", #read depth for snATAC 
+                                 "log10(Gex_nUMI)") #read depth for snRNA 
+                        )
+
+#plot heatmap of all the marker genes
+heatmap_gex <- plotMarkerHeatmap(
+  seMarker = se, 
+  cutOff = "FDR <= 0.01 & Log2FC >= 0.5",
+  #nPrint = 15, #max number of gene to print per cluster
+  transpose = T,
+  labelMarkers = my_markers
+  )
+
+draw(heatmap_gex, heatmap_legend_side = "bot", annotation_legend_side = "bot")
+```
+
+
+```{r}
+#save plot
+plotPDF(heatmap_gex, 
+        name = "GeneExpression-Marker-Heatmap",
+        width = 12,
+        height = 7,
+        addDOC = FALSE)
+```
+
+
+### Get marker genes
+Need to find a way to sort the best marker genes...
+```{r}
+#list of some markers 
+markerList <- getMarkers(se, cutOff = "FDR <= 0.01 & Log2FC >= 1.25") 
+markerList$C6 #change cluster here
+
+
+##print top 20 marker genes per cluster
+# for (cluster in 1: length(markerList)) {
+#     df_markers <- data.frame(genes = markerList@listData[[cluster]]@listData[["name"]],
+#                          MeanDiff = markerList@listData[[cluster]]@listData[["MeanDiff"]])
+#     df_markers_order <- df_markers[order(-df_markers$MeanDiff),]
+#     print(top_n(df_markers_order["genes"], 20))
+#     
+#     list_10 <- c(top_n(df_markers_order["genes"], 10))
+#     
+#     my_df_by_cluster <- data.frame(Cluster = cluster)
+#     my_df_by_cluster <- cbind(my_df_by_cluster, list_10)
+# }
+# 
+# my_df_by_cluster
+```
+
+
+### Visualizing Marker Genes on an Embedding
+
+```{r}
+p <- plotEmbedding(
+    ArchRProj = projMulti2,
+    colorBy = "GeneExpressionMatrix",
+    name = my_markers,
+    embedding = "UMAPHarmony", #can select the dimensionality reduction here
+    quantCut = c(0.01, 0.95),
+    imputeWeights = NULL
+)
+```
+
+
+```{r}
+#plot 1 embedding per selected genes
+p <- lapply(p, function(x){
+    x + guides(color = FALSE, fill = FALSE) + 
+    theme_ArchR(baseSize = 6.5) +
+    theme(plot.margin = unit(c(0, 0, 0, 0), "cm")) +
+    theme(
+        axis.text.x=element_blank(), 
+        axis.ticks.x=element_blank(), 
+        axis.text.y=element_blank(), 
+        axis.ticks.y=element_blank()
+    )
+})
+do.call(cowplot::plot_grid, c(list(ncol = 1),p))
+```
+
+
+```{r}
+#save plot
+plotPDF(plotList = p, 
+        name = "Plot-UMAP-Marker-Genes-WO-Imputation.pdf", 
+        ArchRProj = projMulti2,
+        addDOC = FALSE,
+        width = 5,
+        height = 5)
+```
+
+
+### Marker genes imputation with MAGIC (point 7.5 in manual)
+
+```{r}
+projMulti2 <- addImputeWeights(ArchRProj = projMulti2,
+                               reducedDims = "LSI_Combined")
+```
+
+
+```{r}
+p <- plotEmbedding(
+    ArchRProj = projMulti2, 
+    colorBy = "GeneExpressionMatrix", 
+    name = my_markers, 
+    embedding = "UMAPHarmony", #can select the dimensionality reduction here
+    imputeWeights = getImputeWeights(projMulti2)
+)
+```
+
+
+```{r}
+#Rearrange for grid plotting
+p <- lapply(p, function(x){
+    x + guides(color = FALSE, fill = FALSE) + 
+    theme_ArchR(baseSize = 6.5) +
+    theme(plot.margin = unit(c(0, 0, 0, 0), "cm")) +
+    theme(
+        axis.text.x=element_blank(), 
+        axis.ticks.x=element_blank(), 
+        axis.text.y=element_blank(), 
+        axis.ticks.y=element_blank()
+    )
+})
+do.call(cowplot::plot_grid, c(list(ncol = 3),p))
+```
+
+
+```{r}
+#save plot
+plotPDF(plotList = p, 
+        name = "Plot-UMAP-Marker-Genes-W-Imputation.pdf", 
+        ArchRProj = projMulti2,
+        addDOC = FALSE,
+        width = 5,
+        height = 5)
+```
+
+
+### Track Plotting (point 7.6 in manual)
+
+```{r}
+p <- plotBrowserTrack(
+    ArchRProj = projMulti2, 
+    groupBy = "Clusters_Combined", 
+    geneSymbol = my_markers, 
+    upstream = 50000,
+    downstream = 50000
+)
+```
+
+
+```{r}
+#plot the coverage of selected marker among the clusters
+grid::grid.newpage()
+grid::grid.draw(p$Tenm1) #select cluster here
+```
+
+
+```{r}
+#save plot
+plotPDF(plotList = p, 
+        name = "Plot-Tracks-Marker-Genes.pdf", 
+        ArchRProj = projMulti2,
+        addDOC = FALSE,
+        width = 5,
+        height = 5)
+```
+
+
+```{r}
+#save project since we will change project now
+saveArchRProject(ArchRProj = projMulti2, outputDirectory = "Save-ProjMulti2", load = F)
+```
+
+
+```{r}
+#load the project from last saved project (if necessary)
+#library(ArchR)
+#projMulti2 <- loadArchRProject(path = "./Save-ProjMulti2", force = FALSE, showLogo = TRUE)
+```
+
+## Annotate cells (point 8 in manual)
+(Similar to Jakub's script in chapter 6 of his document.)
+
+Since we don't have our cells labeled, we need to infer their origin from the clusters we have and a the http://mousebrain.org database:
+
+"""
+path to reference genome:
+/Users/raphaelmauron/archr_rr3/data-raw/ref_data/mousebrain_tax4_subsampled.Rds
+"""
+
+
+### Integration of db
+Done in the way the authors integrate RNA (when snATAC-seq is not from multiome analysis (snATAC + snRNA)).
+
+Here integrate database which will allow to annotate each cells by running probability compared to the *GeneExpressionMatrix* we have from our own snRNA-seq.
+
+```{r}
+#loading the database file in seurat format
+
+#setwd("/Users/raphaelmauron/archr_rr3/data-raw/ref_data/mousebrain_tax4_subsampled.Rds")
+
+se_RNA_mousebrain_data <- readRDS(file = "/Users/raphaelmauron/archr_rr3/data-raw/ref_data/mousebrain_tax4_subsampled.Rds")
+se_RNA_mousebrain_data
+```
+
+
+```{r}
+#check requirement for seurat object before integration
+#1
+"RNA" %in% names(se_RNA_mousebrain_data@assays)
+
+#2 all the cell types found in the database just linked:
+#colnames(se_RNA_mousebrain_data@meta.data)
+unique(se_RNA_mousebrain_data@meta.data$TaxonomyRank4)
+```
+
+
+!!! Here need to find a way to add matrix for TaxRank 1-4 in the same projMulti3...
+```{r}
+#unconstrained method (8.1.1 in manual)
+#TaxonomyRank1
+projMulti3 <- addGeneIntegrationMatrix(
+    ArchRProj = projMulti2, 
+    useMatrix = "GeneExpressionMatrix",
+    matrixName = "GeneIntegrationMatrix_db_1",
+    reducedDims = "LSI_Combined", # can we do "Harmony" here??? We should..
+    seRNA = se_RNA_mousebrain_data,
+    addToArrow = FALSE,
+    groupRNA = "TaxonomyRank1",
+    nameCell = "predictedCell_Un_1", #store cell ID from matched RNA expr
+    nameGroup = "predictedGroup_Un_1", #store the group ID
+    nameScore = "predictedScore_Un_1" #store the cross-platform integration score
+)
+
+p1 <- plotEmbedding(
+    projMulti3,
+    colorBy = "cellColData",
+    name = "predictedGroup_Un_1",
+    embedding = "UMAP_Combined",
+    pal = paletteDiscrete(values = unique(projMulti3@cellColData@listData[["predictedGroup_Un_1"]]))
+)
+
+p1_1 <- plotEmbedding(
+    projMulti3,
+    colorBy = "cellColData",
+    name = "predictedGroup_Un_1",
+    embedding = "UMAPHarmony",
+    pal = paletteDiscrete(values = unique(projMulti3@cellColData@listData[["predictedGroup_Un_1"]]), set = "stallion2")
+)
+
+p1
+p1_1
+```
+
+
+```{r}
+#TaxonomyRank2
+projMulti3 <- addGeneIntegrationMatrix(
+    ArchRProj = projMulti2, 
+    useMatrix = "GeneExpressionMatrix",
+    matrixName = "GeneIntegrationMatrix_db_2",
+    reducedDims = "LSI_Combined", # can we do "Harmony" here??? We should..
+    seRNA = se_RNA_mousebrain_data,
+    addToArrow = FALSE,
+    groupRNA = "TaxonomyRank2",
+    nameCell = "predictedCell_Un_2",
+    nameGroup = "predictedGroup_Un_2",
+    nameScore = "predictedScore_Un_2"
+)
+
+p2 <- plotEmbedding(
+    projMulti3,
+    colorBy = "cellColData",
+    name = "predictedGroup_Un_2",
+    embedding = "UMAPHarmony",
+    pal = paletteDiscrete(values = unique(projMulti3@cellColData@listData[["predictedGroup_Un_2"]]))
+)
+
+p2
+```
+
+
+```{r}
+#TaxonomyRank3
+projMulti3 <- addGeneIntegrationMatrix(
+    ArchRProj = projMulti2, 
+    useMatrix = "GeneExpressionMatrix",
+    matrixName = "GeneIntegrationMatrix_db_3",
+    reducedDims = "LSI_Combined", # can we do "Harmony" here??? We should..
+    seRNA = se_RNA_mousebrain_data,
+    addToArrow = FALSE,
+    groupRNA = "TaxonomyRank3",
+    nameCell = "predictedCell_Un_3",
+    nameGroup = "predictedGroup_Un_3",
+    nameScore = "predictedScore_Un_3"
+)
+
+p3 <- plotEmbedding(
+    projMulti3,
+    colorBy = "cellColData",
+    name = "predictedGroup_Un_3",
+    embedding = "UMAPHarmony",
+    pal = paletteDiscrete(values = unique(projMulti3@cellColData@listData[["predictedGroup_Un_3"]]))
+)
+
+p3
+```
+
+
+```{r}
+#TaxonomyRank4
+projMulti3 <- addGeneIntegrationMatrix(
+    ArchRProj = projMulti2, 
+    useMatrix = "GeneExpressionMatrix",
+    matrixName = "GeneIntegrationMatrix_db_4",
+    reducedDims = "Harmony", # can we do "Harmony" here??? We should..LSI_Combined
+    seRNA = se_RNA_mousebrain_data,
+    addToArrow = FALSE,
+    groupRNA = "TaxonomyRank4",
+    nameCell = "predictedCell_Un_4",
+    nameGroup = "predictedGroup_Un_4",
+    nameScore = "predictedScore_Un_4"
+)
+
+
+p4 <- plotEmbedding(
+    projMulti3,
+    colorBy = "cellColData",
+    name = "predictedGroup_Un_4",
+    embedding = "UMAPHarmony",
+    pal = paletteDiscrete(values = unique(projMulti3@cellColData@listData[["predictedGroup_Un_4"]]), set = "stallion")
+
+)
+
+p4
+```
+
+```{r}
+#save plot
+plotPDF(p1, p1_1, p2, p3, p4, 
+        name = "Plot-HarmonyUMAP-Cell-Annotation.pdf", 
+        ArchRProj = projMulti3,
+        addDOC = FALSE,
+        width = 5,
+        height = 5)
+```
+
+
+```{r}
+saveArchRProject(ArchRProj = projMulti3, outputDirectory = "Save-ProjMulti3", load = F)
+```
+
+
+```{r}
+#load the project from last saved project (if necessary)
+library(ArchR)
+projMulti3 <- loadArchRProject(path = "./Save-ProjMulti3", force = FALSE, showLogo = TRUE)
+```
+
+
+```{r}
+#add cell annotation to ArrowFiles & create new project
+projMulti4 <- addGeneIntegrationMatrix(
+    ArchRProj = projMulti3, 
+    useMatrix = "GeneExpressionMatrix",
+    matrixName = "GeneIntegrationMatrix_db_4",
+    reducedDims = "LSI_Combined",
+    seRNA = se_RNA_mousebrain_data,
+    addToArrow = TRUE, #rerun previous chunk but now add the cell annotation
+    force = TRUE, #to allow rerun
+    groupRNA = "TaxonomyRank4",
+    nameCell = "predictedCell_Un_4",
+    nameGroup = "predictedGroup_Un_4",
+    nameScore = "predictedScore_Un_4"
+)
+```
+
+
+```{r}
+#check available matrices in the project. The latest name passed through "matrixName" should figure below. 
+#At this stage we don't have "PeakMatrix" yet
+getAvailableMatrices(projMulti4) 
+```
+
+
+## Calling Peaks (point 9 & 10 in manual)
+
+```{r}
+#add coverage (point 9 in manual)
+projMulti4 <- addGroupCoverages(
+    ArchRProj = projMulti4, 
+    groupBy = "Clusters_Combined", #"CellColData" ??
+    verbose = FALSE, force = T)
+
+#get path to the python tool installed through miniconda (MACS2)
+projMulti4 <- addReproduciblePeakSet(
+    ArchRProj = projMulti4, 
+    groupBy = "Clusters_Combined", #"CellColData" ??
+    pathToMacs2 = "/Users/raphaelmauron/Library/Python/3.9/bin/macs2")
+
+#add peaks just found
+projMulti4 <- addPeakMatrix(ArchRProj = projMulti4)
+
+#peak2genes (point 15.3 in manual)
+projMulti4 <- addPeak2GeneLinks(
+    ArchRProj = projMulti4, 
+    reducedDims = "LSI_Combined", #"Harmony" ??
+    useMatrix = "GeneExpressionMatrix")
+
+p2g <- getPeak2GeneLinks(ArchRProj = projMulti4)
+
+p2g[[1]]
+```
+
+
+```{r}
+#check again the matrices available in the project. Should get "PeakMatrix"
+getAvailableMatrices(projMulti4) 
+```
+
+
+## Identifying Marker Peaks (point 11 in manual)
+
+### Marker Peaks
+
+```{r}
+#Our scRNA labels to remind ourselves of the cell types that we are working with in projMulti4
+table(projMulti4@cellColData@listData[["predictedGroup_Un_4"]])
+```
+
+
+```{r}
+#indentify marker peaks by calling addMarkerFeatures()
+markersPeaks <- getMarkerFeatures(
+    ArchRProj = projMulti4, 
+    useMatrix = "PeakMatrix", 
+    groupBy = "predictedGroup_Un_4", #feature to group by in proj@cellColData@listData[["xxxxxxx"]]
+    bias = c("TSSEnrichment", 
+             "log10(nFrags)", 
+             "log10(Gex_nUMI)"), 
+    testMethod = "wilcoxon"
+)
+```
+
+
+```{r}
+#object returned by the getMarkerFeatures() function
+#SummarizedExperiment that contains a few different assays
+markersPeaks
+```
+
+
+```{r}
+#use the getMarkers() function to retrieve particular slices of this SummarizedExperiment that we are interested in
+#return a list of DataFrame objects, one for each cell group
+markerList <- getMarkers(markersPeaks, cutOff = "FDR <= 0.01 & Log2FC >= 1")
+markerList
+```
+
+
+```{r}
+#marker peaks for a specific cell group
+markerList$Oligodendrocytes #change cell type
+```
+
+
+```{r}
+#return a GRangesList instead of a DataFrame object.
+markerList <- getMarkers(markersPeaks, 
+                         cutOff = "FDR <= 0.01 & Log2FC >= 1", 
+                         returnGR = TRUE)
+markerList
+```
+
+
+```{r}
+#fmarker peaks for a specific cell group 
+#but here retrieve from the GRangesList
+markerList$Oligodendrocytes #change cell type
+```
+
+
+### Plotting Marker Peaks
+
+multiple plotting functions to interact with the SummarizedExperiment objects returned by getMarkerFeatures()
+
+#### Marker Peak Heatmaps
+
+```{r}
+heatmapPeaks <- plotMarkerHeatmap(
+  seMarker = markersPeaks, 
+  cutOff = "FDR <= 0.1 & Log2FC >= 0.5",
+  transpose = TRUE
+)
+```
+
+
+```{r}
+draw(heatmapPeaks, heatmap_legend_side = "bot", annotation_legend_side = "bot")
+```
+
+
+```{r}
+#save plot
+plotPDF(heatmapPeaks, name = "Peak-Marker-Heatmap", width = 8, height = 6, ArchRProj = projMulti4, addDOC = FALSE)
+```
+
+
+### MA and Volcano Plots
+
+We can plot MA or Volcano plot for any individual cell group.
+
+#### MA plot
+
+```{r}
+# MA plot
+pma <- plotMarkers(
+    seMarker = markersPeaks, 
+    name = "Oligodendrocytes", #change cell name
+    cutOff = "FDR <= 0.1 & Log2FC >= 1", 
+    plotAs = "MA")
+pma
+```
+
+
+#### Volcano plot
+
+```{r}
+#Volcano plot
+pv <- plotMarkers(
+    seMarker = markersPeaks, 
+    name = "Oligodendrocytes", #change cell name
+    cutOff = "FDR <= 0.1 & Log2FC >= 1", 
+    plotAs = "Volcano")
+pv
+```
+
+
+```{r}
+#save plots
+plotPDF(pma, pv, name = "Oligodendrocytes-Markers-MA-Volcano", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+```
+
+
+#### Marker Peaks in Browser Tracks
+
+can see these peak regions overlayed on our browser tracks by passing the relevant peak regions to the features parameterin the plotBrowserTrack() function. This will add an additional BED-style track of marker peak regions to the bottom of our ArchR track plot. Here we specify plotting the GATA1 gene via the geneSymbol parameter
+
+```{r}
+p <- plotBrowserTrack(
+    ArchRProj = projMulti4, 
+    groupBy = "predictedGroup_Un_4", #change group here
+    geneSymbol = c("Kcnd2"), #specify marker gene here
+    features =  getMarkers(markersPeaks, cutOff = "FDR <= 0.1 & Log2FC >= 1", returnGR = TRUE)["Oligodendrocytes"],
+    upstream = 50000,
+    downstream = 50000
+)
+```
+
+
+We can plot this
+
+```{r}
+grid::grid.newpage()
+grid::grid.draw(p$Kcnd2) #specify marker gene to plot
+```
+
+
+```{r}
+#save plot
+plotPDF(p, name = "Plot-Tracks-With-Features", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+```
+
+
+### Pairwise Testing Between Groups
+
+!!! ArchR also enables standard differential testing using the same getMarkerFeatures() function. The trick is to set useGroups to one of the two cell groups and bgdGroups to the other cell group.
+
+```{r}
+# group 1: useGroups
+# rgoup 2: bgdGroups
+markerTest <- getMarkerFeatures( ### markerTest is also used in other downstream analysis
+  ArchRProj = projMulti4, 
+  useMatrix = "PeakMatrix",
+  groupBy = "predictedGroup_Un_4",
+  testMethod = "wilcoxon",
+  bias = c("TSSEnrichment", "log10(nFrags)"),
+  useGroups = "Oligodendrocytes", #cell type 1
+  bgdGroups = "Oligodendrocyte precursor cells" #cell type 2
+)
+```
+
+```{r}
+#plot MA
+pma <- markerPlot(
+    seMarker = markerTest, 
+    name = "Oligodendrocytes", #change cell type
+    cutOff = "FDR <= 0.1 & abs(Log2FC) >= 1", 
+    plotAs = "MA")
+pma
+```
+
+
+```{r}
+#plot Volcano
+pv <- markerPlot(
+    seMarker = markerTest, 
+    name = "Oligodendrocytes", #change cell type
+    cutOff = "FDR <= 0.1 & abs(Log2FC) >= 1", 
+    plotAs = "Volcano")
+pv
+```
+
+
+```{r}
+#save plots
+plotPDF(pma, pv, name = "Oligodendrocytes-vs-Oligodendrocyte_precursor_cells-Markers-MA-Volcano", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+```
+
+
+## Motif and Feature Enrichment (point 12 in manual)
+
+Want to predict what transcription factors may be mediating the binding events that create those accessible chromatin sites.
+
+Can look for motifs that are enriched in peaks that are up or down regulated in various cell types.
+
+- add these motif annotations to our project
+it creates a binary matrix where the presence of a motif in each peak is indicated numerically
+
+### Motif Enrichment in Differential Peaks
+
+```{r}
+projMulti4 <- addMotifAnnotations(
+    ArchRProj = projMulti4, 
+    motifSet = "cisbp", 
+    name = "Motif")
+```
+
+
+We can then use the differential testing SummarizedExperiment object markerTest which was generated in the previous chapter to define the set of significantly differential peaks that we are interested in testing for motif enrichment.
+
+```{r}
+#based on the markerTest from previous analysis
+motifsUp <- peakAnnoEnrichment(
+    seMarker = markerTest,
+    ArchRProj = projMulti4,
+    peakAnnotation = "Motif",
+    cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
+  )
+```
+
+
+```{r}
+#output of peakAnnoEnrichment() is a SummarizedExperiment object containing multiple assays that store the results of enrichment testing with the hypergeometric test
+motifsUp
+```
+
+
+```{r}
+#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
+df <- data.frame(TF = rownames(motifsUp), mlog10Padj = assay(motifsUp)[,1])
+df <- df[order(df$mlog10Padj, decreasing = TRUE),]
+df$rank <- seq_len(nrow(df))
+```
+
+```{r}
+#to test the most enriched motifs in the peaks 
+head(df)
+```
+
+
+```{r}
+# NOTE: if only very few marker on the graph, run "options(ggrepel.max.overlaps = Inf)" in the console before hand.
+options(ggrepel.max.overlaps = Inf)
+```
+
+
+```{r}
+#Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
+
+ggUp <- ggplot(df, aes(rank, mlog10Padj, color = mlog10Padj)) + 
+  geom_point(size = 1) +
+  ggrepel::geom_label_repel(
+        data = df[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
+        size = 1.5,
+        nudge_x = 2,
+        color = "black",
+
+  ) + theme_ArchR() + 
+  ylab("-log10(P-adj) Motif Enrichment") + 
+  xlab("Rank Sorted TFs Enriched") +
+  scale_color_gradientn(colors = paletteContinuous(set = "comet"))
+
+ggUp
+```
+
+
+```{r}
+# for the peaks that are more accessible in the "Progenitor" cells by using peaks with Log2FC <= -0.5
+motifsDo <- peakAnnoEnrichment(
+    seMarker = markerTest,
+    ArchRProj = projMulti4,
+    peakAnnotation = "Motif",
+    cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
+  )
+```
+
+
+```{r}
+motifsDo
+```
+
+
+```{r}
+df <- data.frame(TF = rownames(motifsDo), mlog10Padj = assay(motifsDo)[,1])
+df <- df[order(df$mlog10Padj, decreasing = TRUE),]
+df$rank <- seq_len(nrow(df))
+```
+
+
+```{r}
+head(df)
+```
+
+
+```{r}
+ggDo <- ggplot(df, aes(rank, mlog10Padj, color = mlog10Padj)) + 
+  geom_point(size = 1) +
+  ggrepel::geom_label_repel(
+        data = df[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
+        size = 1.5,
+        nudge_x = 2,
+        color = "black"
+  ) + theme_ArchR() + 
+  ylab("-log10(FDR) Motif Enrichment") +
+  xlab("Rank Sorted TFs Enriched") +
+  scale_color_gradientn(colors = paletteContinuous(set = "comet"))
+
+ggDo
+```
+
+
+```{r}
+#save plots
+plotPDF(ggUp, ggDo, name = "Oligodendrocytes-vs-Oligodendrocytes-Markers-Motifs-Enriched", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+```
+
+
+
+### Motif Enrichment in Marker Peaks
+
+Can also perform motif enrichment on our marker peaks identified in using getMarkerFeatures()
+
+```{r}
+enrichMotifs <- peakAnnoEnrichment(
+    seMarker = markersPeaks,
+    ArchRProj = projMulti4,
+    peakAnnotation = "Motif",
+    cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
+  )
+```
+
+
+```{r}
+enrichMotifs
+```
+
+
+```{r}
+#plot motif enrichments across all cell groups
+heatmapEM <- plotEnrichHeatmap(enrichMotifs, 
+                               n = 7, #number of motifs shown per cell group
+                               transpose = TRUE)
+```
+
+
+```{r}
+#plot
+ComplexHeatmap::draw(heatmapEM, heatmap_legend_side = "bot", annotation_legend_side = "bot")
+```
+
+
+```{r}
+#save plot
+plotPDF(heatmapEM, name = "Motifs-Enriched-Marker-Heatmap", width = 8, height = 6, ArchRProj = projMulti4, addDOC = FALSE)
+```
+
+
+
+### ArchR Enrichment
+Can use other collections in order to identify enrichment motifs
+
+- Encode
+- Bulk ATAC-seq
+- Codex
+
+#### Encode TF Binding Sites
+
+```{r}
+# #add the annotations
+# projMulti4 <- addArchRAnnotations(
+#     ArchRProj = projMulti4, 
+#     collection = "EncodeTFBS")
+```
+
+
+```{r}
+# # test for enrichment of those annotations
+# enrichEncode <- peakAnnoEnrichment(
+#     seMarker = markersPeaks,
+#     ArchRProj = projMulti4,
+#     peakAnnotation = "EncodeTFBS",
+#     cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
+#   )
+```
+
+
+```{r}
+# #returns a SummarizedExperiment object
+# enrichEncode
+```
+
+
+```{r}
+# #create heatmap
+# heatmapEncode <- plotEnrichHeatmap(enrichEncode, n = 7, transpose = TRUE)
+```
+
+
+```{r}
+# #plot heatmap
+# ComplexHeatmap::draw(heatmapEncode, heatmap_legend_side = "bot", annotation_legend_side = "bot")
+```
+
+
+```{r}
+# #save plot
+# plotPDF(heatmapEncode, name = "EncodeTFBS-Enriched-Marker-Heatmap", width = 8, height = 6, ArchRProj = projMulti4, addDOC = FALSE)
+```
+
+
+#### Bulk ATAC-seq
+Peak calls from bulk ATAC-seq experiments that can be used for overlap enrichment testing.
+
+```{r}
+# #add annotation
+# projMulti4 <- addArchRAnnotations(
+#     ArchRProj = projMulti4, 
+#     collection = "ATAC")
+```
+
+
+```{r}
+# #test for enrichment
+# enrichATAC <- peakAnnoEnrichment(
+#     seMarker = markersPeaks,
+#     ArchRProj = projMulti4,
+#     peakAnnotation = "ATAC",
+#     cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
+#   )
+```
+
+
+```{r}
+# #check object
+# enrichATAC
+```
+
+
+```{r}
+# #create heatmap
+# heatmapATAC <- plotEnrichHeatmap(enrichATAC, n = 7, transpose = TRUE)
+```
+
+
+```{r}
+# #plot
+# ComplexHeatmap::draw(heatmapATAC, heatmap_legend_side = "bot", annotation_legend_side = "bot")
+```
+
+
+```{r}
+# #save plot
+# plotPDF(heatmapATAC, name = "ATAC-Enriched-Marker-Heatmap", width = 8, height = 6, ArchRProj = projMulti4, addDOC = FALSE)
+```
+
+
+#### Codex TFBS
+Same analysis performed for codex.
+
+```{r}
+# #add annotations
+# projMulti4 <- addArchRAnnotations(ArchRProj = projMulti4, collection = "Codex")
+```
+
+
+```{r}
+# #enrichment
+# enrichCodex <- peakAnnoEnrichment(
+#     seMarker = markersPeaks,
+#     ArchRProj = projMulti4,
+#     peakAnnotation = "Codex",
+#     cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
+#   )
+```
+
+
+```{r}
+# #return object
+# enrichCodex
+```
+
+
+```{r}
+# #create heatmap
+# heatmapCodex <- plotEnrichHeatmap(enrichCodex, n = 7, transpose = TRUE)
+```
+
+
+```{r}
+# #plot
+# ComplexHeatmap::draw(heatmapCodex, heatmap_legend_side = "bot", annotation_legend_side = "bot")
+```
+
+
+```{r}
+# #save plot
+# plotPDF(heatmapCodex, name = "Codex-Enriched-Marker-Heatmap", width = 8, height = 6, ArchRProj = projMulti4, addDOC = FALSE)
+```
+
+
+### Custom Enrichment
+
+Can accept user-defined annotations to perform custom enrichments.
+
+We illustrate how to create a custom annotation based on select ENCODE ChIP-seq experiments
+
+!!! might not work with the data your passing so code is commented.
+
+```{r}
+# #define dataset that we will use + loading
+# EncodePeaks <- c(
+#   Encode_K562_GATA1 = "https://www.encodeproject.org/files/ENCFF632NQI/@@download/ENCFF632NQI.bed.gz",
+#   Encode_GM12878_CEBPB = "https://www.encodeproject.org/files/ENCFF761MGJ/@@download/ENCFF761MGJ.bed.gz",
+#   Encode_K562_Ebf1 = "https://www.encodeproject.org/files/ENCFF868VSY/@@download/ENCFF868VSY.bed.gz",
+#   Encode_K562_Pax5 = "https://www.encodeproject.org/files/ENCFF339KUO/@@download/ENCFF339KUO.bed.gz"
+# )
+```
+
+
+```{r}
+# #add custom annotation
+# projMulti4 <- addPeakAnnotations(ArchRProj = projMulti4, regions = EncodePeaks, name = "ChIP")
+```
+
+
+```{r}
+# #test enrichment
+# enrichRegions <- peakAnnoEnrichment(
+#     seMarker = markersPeaks,
+#     ArchRProj = projMulti4,
+#     peakAnnotation = "ChIP",
+#     cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
+#   )
+```
+
+
+```{r}
+# #return object
+# enrichRegions
+```
+
+
+```{r}
+# #create heatmap
+# heatmapRegions <- plotEnrichHeatmap(enrichRegions, n = 7, transpose = TRUE)
+```
+
+
+```{r}
+# #plot
+# ComplexHeatmap::draw(heatmapRegions, heatmap_legend_side = "bot", annotation_legend_side = "bot")
+```
+
+
+```{r}
+# #save plot
+# plotPDF(heatmapRegions, name = "Regions-Enriched-Marker-Heatmap", width = 8, height = 6, ArchRProj = projMulti4, addDOC = FALSE)
+```
+
+
+## ChromVAR Deviations Enrichment (point 13 in manual)
+
+Here allow a per-cell basis enrichment count.
+chromVAR also account for Tn5 transposases insertion bias !!!
+
+ArchR uses chromVAR:
+- reads in the global accessibility per peak across all cells in each sub-samples
+- For each peak, identifies a set of background peaks that are matched by GC-content and accessibility
+- uses this background set of peaks and global accessibility to compute bias-corrected deviations with chromVAR for each sample independently
+
+
+### Motif Deviations
+
+```{r}
+#make sure we have added motif annotations to the project
+## if motif not in names(projMulti4@peakAnnotation), then add it
+if("Motif" %ni% names(projMulti4@peakAnnotation)){
+    projMulti4 <- addMotifAnnotations(ArchRProj = projMulti4, motifSet = "cisbp", name = "Motif")
+}
+```
+
+
+```{r}
+#add set of background peaks
+projMulti4 <- addBgdPeaks(projMulti4)
+```
+
+
+```{r}
+#compute per-cell deviations accross all of our motif annotations
+#create a deviations matrix in each of our Arrow files called "MotifMatrix"
+projMulti4 <- addDeviationsMatrix(
+  ArchRProj = projMulti4, 
+  peakAnnotation = "Motif",
+  force = TRUE
+)
+```
+
+
+```{r}
+#to access those deivations
+plotVarDev <- getVarDeviations(projMulti4, name = "MotifMatrix", plot = TRUE)
+```
+
+
+```{r}
+#plot
+plotVarDev
+```
+
+
+```{r}
+#save plot
+plotPDF(plotVarDev, name = "Variable-Motif-Deviation-Scores", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+```
+
+
+#### Analyze variability of a subset of features
+
+```{r}
+#to analyze subset of features
+motifs <- c("Smarcc1", #from list above
+                 "Fos",
+                 "Bach1",
+                 "Msc", #C1
+                 "Neurod2", #C2
+                 "Neurod4", #C3
+                 "Neurog1", #C4
+                 "Sfpi1", #C6
+                 "Neurod1" #C7
+                 ) #specify motifs here
+markerMotifs <- getFeatures(projMulti4, select = paste(motifs, collapse="|"), useMatrix = "MotifMatrix")
+markerMotifs
+```
+
+
+```{r}
+#want to remove a specific marker
+markerMotifs <- grep("z:", markerMotifs, value = TRUE) #keeps only z-values
+markerMotifs <- markerMotifs[markerMotifs %ni% "z:SREBF1_22"] #remove this specific marker
+markerMotifs
+```
+
+
+```{r}
+#plot the distribution of chromVAR deviation scores for each cluster
+#Notice that we supply the impute weights that we calculated previously during our gene score analyses
+#these impute weights allow us to smooth the signal across nearby cells which is helpful in the context of our sparse scATAC-seq data
+
+p <- plotGroups(ArchRProj = projMulti4, 
+  groupBy = "predictedGroup_Un_4", 
+  colorBy = "MotifMatrix", 
+  name = markerMotifs,
+  imputeWeights = getImputeWeights(projMulti4)
+)
+```
+
+!!! Need more than 1 motif
+```{r}
+#cowplot to plot the distributions of all motifs in a single plot
+p2 <- lapply(seq_along(p), function(x){
+  if(x != 1){
+    p[[x]] + guides(color = "none", fill = "none") + 
+    theme_ArchR(baseSize = 6) +
+    theme(plot.margin = unit(c(0.1, 0.1, 0.1, 0.1), "cm")) +
+    theme(
+        axis.text.y=element_blank(), 
+        axis.ticks.y=element_blank(),
+        axis.title.y=element_blank()
+    ) + ylab("")
+  }else{
+    p[[x]] + guides(color = "none", fill = "none") + 
+    theme_ArchR(baseSize = 6) +
+    theme(plot.margin = unit(c(0.1, 0.1, 0.1, 0.1), "cm")) +
+    theme(
+        axis.ticks.y=element_blank(),
+        axis.title.y=element_blank()
+    ) + ylab("")
+  }
+})
+do.call(cowplot::plot_grid, c(list(nrow = 1, rel_widths = c(2, rep(1, length(p2) - 1))),p2))
+```
+
+
+```{r}
+#save plot
+plotPDF(p, name = "Plot-Groups-Deviations-w-Imputation", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+```
+
+
+#### Overlay z-scores on UMAP
+
+```{r}
+#overlay the z-scores on our UMAP embedding as we've done previously for gene scores
+p <- plotEmbedding(
+    ArchRProj = projMulti4, 
+    colorBy = "MotifMatrix", 
+    name = sort(markerMotifs), 
+    embedding = "UMAPHarmony", #can change embedding here
+    imputeWeights = getImputeWeights(projMulti4)
+)
+```
+
+
+```{r}
+#can plot all of these motif UMAPs using cowplot
+p2 <- lapply(p, function(x){
+    x + guides(color = FALSE, fill = FALSE) + 
+    theme_ArchR(baseSize = 6.5) +
+    theme(plot.margin = unit(c(0, 0, 0, 0), "cm")) +
+    theme(
+        axis.text.x=element_blank(), 
+        axis.ticks.x=element_blank(), 
+        axis.text.y=element_blank(), 
+        axis.ticks.y=element_blank()
+    )
+})
+do.call(cowplot::plot_grid, c(list(ncol = 3),p2))
+```
+
+
+#### Overlay Gene Expression 
+
+To see how these TF deviation z-scores compare to the inferred gene expression via gene scores of the corresponding TF genes, we can overlay the gene scores for each of these TFs on the UMAP embedding.
+
+
+```{r}
+markerRNA <- getFeatures(projMulti4, 
+                         select = paste(motifs, collapse="|"), 
+                         useMatrix = "GeneExpressionMatrix")
+#markerRNA <- markerRNA[markerRNA %ni% c("SREBF1","CEBPA-DT")] #exclude some motifs
+markerRNA
+```
+
+
+```{r}
+p <- plotEmbedding(
+    ArchRProj = projMulti4, 
+    colorBy = "GeneExpressionMatrix", 
+    name = sort(markerRNA), 
+    embedding = "UMAPHarmony",
+    imputeWeights = getImputeWeights(projMulti4)
+)
+```
+
+
+```{r}
+#cowplot to plot single features
+p2 <- lapply(p, function(x){
+    x + guides(color = FALSE, fill = FALSE) + 
+    theme_ArchR(baseSize = 6.5) +
+    theme(plot.margin = unit(c(0, 0, 0, 0), "cm")) +
+    theme(
+        axis.text.x=element_blank(), 
+        axis.ticks.x=element_blank(), 
+        axis.text.y=element_blank(), 
+        axis.ticks.y=element_blank()
+    )
+})
+do.call(cowplot::plot_grid, c(list(ncol = 3),p2))
+```
+
+
+#### Overlay Linked gene expression (ATAC + RNA)
+
+Similarly, because we previously linked our scATAC-seq data with corresponding scRNA-seq data, we can plot the linked gene expression for each of these TFs on the UMAP embedding.
+
+```{r}
+getAvailableMatrices(projMulti4)
+```
+
+
+```{r}
+markerRNA <- getFeatures(projMulti4,
+                         select = paste(motifs, collapse="|"),
+                         useMatrix = "GeneIntegrationMatrix_db_4") ###??? which matrix
+
+#markerRNA <- markerRNA[markerRNA %ni% c("SREBF1","CEBPA-DT")]
+markerRNA
+```
+
+
+```{r}
+p <- plotEmbedding(
+    ArchRProj = projMulti4,
+    colorBy = "GeneIntegrationMatrix_db_4", # ???
+    name = sort(markerRNA),
+    embedding = "UMAPHarmony",
+    continuousSet = "blueYellow",
+    imputeWeights = getImputeWeights(projMulti4)
+)
+```
+
+
+```{r}
+p2 <- lapply(p, function(x){
+    x + guides(color = FALSE, fill = FALSE) +
+    theme_ArchR(baseSize = 6.5) +
+    theme(plot.margin = unit(c(0, 0, 0, 0), "cm")) +
+    theme(
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()
+    )
+})
+do.call(cowplot::plot_grid, c(list(ncol = 3),p2))
+```
+
+### Also custom Deviations (point 13.2 in manual)
+Not reproduced here.
+
+## Footprinting (point 14 in manual)
+
+Transcription factors (TF) footprinting allows for the prediction of the precise binding location of a TF at a particular locus.
+
+
+### Motif Footprint
+
+```{r}
+#create a GRangesList
+motifPositions <- getPositions(projMulti4)
+```
+
+
+```{r}
+motifPositions
+```
+
+
+```{r}
+#list of marker to use for the subset
+# motifs <- c("Smarcc1", #from list above
+#                  "Fos",
+#                  "Bach1",
+#                  "Msc", #C1
+#                  "Neurod2", #C2
+#                  "Neurod4", #C3
+#                  "Neurog1", #C4
+#                  "Sfpi1", #C6
+#                  "Neurod1" #C7
+#                  ) #specify motifs here
+motifs <- my_markers
+
+markerMotifs <- unlist(lapply(motifs, function(x) grep(x, names(motifPositions), value = TRUE)))
+markerMotifs <- markerMotifs[markerMotifs %ni% "SREBF1_22"]
+markerMotifs
+```
+
+
+```{r}
+projMulti4 <- addGroupCoverages(ArchRProj = projMulti4,
+                                groupBy = "predictedGroup_Un_4")
+```
+
+
+```{r}
+#compute footprints for the subset of marker motifs that we previously selected using the getFootprints() function
+#recommended to perform footprinting on a subset of motifs rather than all motifs
+#provide the subset of motifs to footprint via the positions parameter
+seFoot <- getFootprints(
+  ArchRProj = projMulti4, 
+  positions = motifPositions[markerMotifs], #specify the subset of motifs
+  groupBy = "predictedGroup_Un_4"
+)
+```
+
+
+Once we have retrieved these footprints, we can plot them using the plotFootprints() function.
+
+### Normalization of Footprints for Tn5 Bias
+Normalization of the bias
+
+#### Substracting the Tn5 Bias
+
+```{r}
+#plot footprints
+plotFootprints(
+  seFoot = seFoot,
+  ArchRProj = projMulti4, 
+  normMethod = "Subtract",
+  plotName = "Footprints-Subtract-Bias",
+  addDOC = FALSE,
+  smoothWindow = 5
+)
+```
+
+
+#### Dividing by the Tn5 Bias
+Second strategy for normalization
+
+```{r}
+#other strategy to normalize: divide footprint signal by the Tn5 bias signal
+plotFootprints(
+  seFoot = seFoot,
+  ArchRProj = projMulti4, 
+  normMethod = "Divide",
+  plotName = "Footprints-Divide-Bias",
+  addDOC = FALSE,
+  smoothWindow = 5
+)
+```
+
+
+#### Footprinting Without Normalization for Tn5 Bias
+Normalization is highly recommended but it is possible to plot the footprints without normalization.
+
+```{r}
+#no normalization
+plotFootprints(
+  seFoot = seFoot,
+  ArchRProj = projMulti4, 
+  normMethod = "None", #says that no normalization is performed
+  plotName = "Footprints-No-Normalization",
+  addDOC = FALSE,
+  smoothWindow = 5
+)
+```
+
+
+### Feature Footprinting
+Footprinting of any user-defined feature set
+
+Here, TSS (Transcription Start Site) insertion profile (= specialized subcase of footprinting)
+
+
+```{r}
+#create TSS insertion profiles without normalization for Tn5 bias
+#main difference from our previous analyses is that we specify flank = 2000 to extend these footprints 2000 bp on either side of each TSS
+seTSS <- getFootprints(
+  ArchRProj = projMulti4, 
+  positions = GRangesList(TSS = getTSS(projMulti4)), #specify 
+  groupBy = "predictedGroup_Un_4",
+  flank = 2000 #extend the footprints on both side of each TSS
+)
+```
+
+
+```{r}
+#plot 
+plotFootprints(
+  seFoot = seTSS,
+  ArchRProj = projMulti4, 
+  normMethod = "None",
+  plotName = "TSS-No-Normalization",
+  addDOC = FALSE,
+  flank = 2000,
+  flankNorm = 100
+)
+```
+
+
+## Integrative Analysis (point 15 in manual)
+### Deeper insights !!!
+
+Strength of ArchR is the ability to integrate multiple levels of information to provide novel insights (either ATAC-seq only or analysis integrating scRNA-seq data).
+
+
+### Creating Low-Overlapping Aggregates of Cells (Cicero)
+
+ArchR facilitates many integrative analyses that involve correlation of features.
+With sparse single-cell data, can lead to substantial noise in these correlative analyses.
+
+Here, uses **Cicero** to filter out aggregate with more than 80% overlap.
+
+
+### Co-accessibility with ArchR
+
+Co-accessibility is a correlation in accessibility between 2 peaks across many single cells.
+
+```{r}
+#add co-accessibility peaks to the object
+projMulti4 <- addCoAccessibility(
+    ArchRProj = projMulti4,
+    reducedDims = "LSI_Combined" #can change dimensionality reduction here
+)
+```
+
+
+```{r}
+#retrieve the co-accessibility information
+cA <- getCoAccessibility(
+    ArchRProj = projMulti4,
+    corCutOff = 0.5,
+    resolution = 1,
+    returnLoops = FALSE #returns dataframe only when = FALSE
+)
+```
+
+
+```{r}
+cA
+```
+
+This co-accessibility DataFrame also has a metadata component containing a GRanges object of the relevant peaks. The indexes of queryHits and subjectHits mentioned above apply to this GRanges object.
+
+```{r}
+metadata(cA)[[1]]
+```
+
+
+```{r}
+#resolution = 1 creates loops that connect the center of each peak
+cA <- getCoAccessibility(
+    ArchRProj = projMulti4,
+    corCutOff = 0.5,
+    resolution = 1000, #when decrease the resolution (= 1000 instead of = 1), can help with overplotting of co-accessibility interactions
+    returnLoops = TRUE # return co-accessibility in the form of a loop track
+)
+```
+
+
+```{r}
+cA[[1]]
+```
+
+
+#### Plotting browser tracks of Co-accessibility
+
+Can plot on the browser a list of our markerGenes
+
+```{r}
+# markerGenes <- c("Kcnd2", #from Jakub's list
+#                  "Olfm3",
+#                  "Tenm1",
+#                             #from ranked df from chunk above (MeanDiff)
+#                  "Zfp36l2", #C1
+#                  "Pacrg", #C2
+#                  "Rnf220", #C3
+#                  "Zbtb16", #C4
+#                  "Cbln1", #C6
+#                  "Neurod1" #C7
+#                  )
+markerGenes <- my_markers
+
+p <- plotBrowserTrack(
+    ArchRProj = projMulti4, 
+    groupBy = "predictedGroup_Un_4", 
+    geneSymbol = markerGenes, 
+    upstream = 50000,
+    downstream = 50000,
+    loops = getCoAccessibility(projMulti4)
+)
+```
+
+
+```{r}
+#to open in browser
+grid::grid.newpage()
+grid::grid.draw(p$Kcnd2)
+```
+
+
+```{r}
+#to save
+plotPDF(plotList = p, 
+    name = "Plot-Tracks-Marker-Genes-with-CoAccessibility.pdf", 
+    ArchRProj = projMulti4, 
+    addDOC = FALSE, width = 5, height = 5)
+```
+
+
+### Peak2GeneLinkage (point 15.3 in manual)
+
+Identify "peak to gene links" (done in chapter ("Calling Peaks (point 9 & 10 in manual)") above). Here we will call 
+
+**!!! co-accessibility = ATAC-seq-only analysis**
+
+**!!! Peak2GeneLinkage = leverages scRNA-seq data to look for correlations between peak accessibility and gene expression**
+
+--> correlates scATAC-seq and scRNA-seq: often think of these links as more relevant to gene regulatory interactions.
+
+NB: the code commented below are actually performed in the mentioned chapter earlier: "Calling Peaks (point 9 & 10 in manual)"
+
+```{r}
+#done previously for integration of our own RNA samples
+# #add peak-to-gene links
+# projMulti4 <- addPeak2GeneLinks(
+#     ArchRProj = projMulti4,
+#     reducedDims = "LSI_Combined"
+# )
+```
+
+```{r}
+#done previously for integration of our own RNA samples
+# #retrieve those peak-to-gene links
+# p2g <- getPeak2GeneLinks(
+#     ArchRProj = projMulti4,
+#     corCutOff = 0.45,
+#     resolution = 1,
+#     returnLoops = FALSE
+# )
+```
+
+```{r}
+#p2g
+```
+
+```{r}
+# #The indexes of idxATAC mentioned above apply to this GRanges object
+#metadata(p2g)[[1]]
+```
+
+```{r}
+# #returns loop track GRanges object
+# p2g <- getPeak2GeneLinks(
+#     ArchRProj = projMulti4,
+#     corCutOff = 0.45,
+#     resolution = 1,
+#     returnLoops = TRUE
+# )
+# 
+# p2g[[1]]
+```
+
+
+#### Plotting browser tracks with peak-to-gene links
+
+```{r}
+# markerGenes <- c("Kcnd2", #from Jakub's list
+#                  "Olfm3",
+#                  "Tenm1",
+#                             #from ranked df from chunk above (MeanDiff)
+#                  "Zfp36l2", #C1
+#                  "Pacrg", #C2
+#                  "Rnf220", #C3
+#                  "Zbtb16", #C4
+#                  "Cbln1", #C6
+#                  "Neurod1" #C7
+#                  )
+
+p <- plotBrowserTrack(
+    ArchRProj = projMulti4, 
+    groupBy = "predictedGroup_Un_4", 
+    geneSymbol = markerGenes, 
+    upstream = 50000,
+    downstream = 50000,
+    loops = getPeak2GeneLinks(projMulti4) #the links were stored in projMulti4
+)
+```
+
+
+```{r}
+#plot browser track
+grid::grid.newpage()
+grid::grid.draw(p$Kcnd2)
+```
+
+
+```{r}
+#save plots
+plotPDF(plotList = p, 
+    name = "Plot-Tracks-Marker-Genes-with-Peak2GeneLinks.pdf", 
+    ArchRProj = projMulti4, 
+    addDOC = FALSE, width = 5, height = 5)
+```
+
+
+#### Plotting a heatmap of peak-to-gene links
+
+To visualize the correspondence of all of our **peak-to-gene links**, we can plot a peak-to-gene **heatmap** which contains two side-by-side heatmaps:
+
+- one for our scATAC-seq data
+- one for our scRNA-seq data
+
+```{r}
+p <- plotPeak2GeneHeatmap(ArchRProj = projMulti4, 
+                          groupBy = "predictedGroup_Un_4")
+```
+
+
+The heatmap rows are clustered using k-means clustering based on the value passed to the parameter k, which defaults to 25 as shown below.
+
+```{r}
+#plot
+p
+```
+
+
+```{r}
+#save plot
+plotPDF(p, 
+        name = "Heatmap-coaccessibility-ATAC-RNA.pdf", 
+        ArchRProj = projMulti4, 
+        addDOC = FALSE)
+```
+
+
+### Identification of Positive TF-Regulators (point 15.4 in manual)
+
+- When **RNA-seq not available** in the experiment: use chromVAR deviation z-scores of TF motifs (using "Gene activity matrix")
+
+or
+
+- When **RNA-seq available** in the experiment: use scRNA-seq gene expression of the TF
+
+#### Step1. Identify Deviant TF Motifs
+Did that when creating "MotifMatrix"
+
+```{r}
+#retrieve this data (deviant TF motifs)
+seGroupMotif <- getGroupSE(ArchRProj = projMulti4, 
+                           useMatrix = "MotifMatrix", 
+                           groupBy = "predictedGroup_Un_4")
+```
+
+
+```{r}
+#since it comes from MotifMatrix, has "deviations" & "z" corresponding to row and z-score deviations
+seGroupMotif
+```
+
+
+```{r}
+#subset this SummarizedExperiment to just the "deviation z-scores"
+seZ <- seGroupMotif[rowData(seGroupMotif)$seqnames=="z",]
+```
+
+
+```{r}
+#identify the maximum delta in z-score between all clusters
+#will be helpful in stratifying motifs based on the degree of variation observed across clusters
+rowData(seZ)$maxDelta <- lapply(seq_len(ncol(seZ)), function(x){
+  rowMaxs(assay(seZ) - assay(seZ)[,x])
+}) %>% Reduce("cbind", .) %>% rowMaxs
+```
+
+
+#### Step2. Identify Correlated TF Motifs and TF Gene Score/Expression
+
+To identify TFs whose motif accessibility is correlated with with their own gene activity (either by gene score or gene expression), we use the correlateMatrices() function and provide the **two matrices that we are interested in, in this case the GeneScoreMatrix and the MotifMatrix**.
+
+correlations are determined across many low-overlapping cell aggregates determined in the lower dimension space specified in the reducedDims parameter
+
+```{r}
+corGSM_MM <- correlateMatrices(
+    ArchRProj = projMulti4,
+    useMatrix1 = "GeneExpressionMatrix",
+    useMatrix2 = "MotifMatrix",
+    reducedDims = "LSI_Combined"
+)
+```
+
+
+```{r}
+#look at the dataframe
+corGSM_MM
+```
+
+
+Same analysis with the GeneIntegrationMatrix:
+
+```{r}
+#can perform the same analysis using the GeneIntegrationMatrix instead of the GeneScoreMatrix
+corGIM_MM <- correlateMatrices(
+    ArchRProj = projMulti4,
+    useMatrix1 = "GeneIntegrationMatrix_db_4", #do we have that in our case?
+    useMatrix2 = "MotifMatrix",
+    reducedDims = "LSI_Combined"
+)
+```
+
+
+```{r}
+corGIM_MM
+```
+
+
+#### Step3. Add Maximum Delta Deviation to the Correlation Data Frame
+
+For each of these correlation analyses, we can annotate each motif with the maximum delta observed between clusters which we calculated in Step 1.
+
+```{r}
+corGSM_MM$maxDelta <- rowData(seZ)[match(corGSM_MM$MotifMatrix_name, rowData(seZ)$name), "maxDelta"]
+corGIM_MM$maxDelta <- rowData(seZ)[match(corGIM_MM$MotifMatrix_name, rowData(seZ)$name), "maxDelta"]
+```
+
+
+#### Step4. Identify Positive TF Regulators
+
+Can use all of this information to identify positive TF regulators
+
+consider positive regulators as those TFs whose correlation between motif and gene score (or gene expression) is greater than 0.5 with an adjusted p-value less than 0.01 and a maximum inter-cluster difference in deviation z-score that is in the top quartile.
+
+```{r}
+corGSM_MM <- corGSM_MM[order(abs(corGSM_MM$cor), decreasing = TRUE), ]
+corGSM_MM <- corGSM_MM[which(!duplicated(gsub("\\-.*","",corGSM_MM[,"MotifMatrix_name"]))), ]
+corGSM_MM$TFRegulator <- "NO"
+corGSM_MM$TFRegulator[which(corGSM_MM$cor > 0.5 & corGSM_MM$padj < 0.01 & corGSM_MM$maxDelta > quantile(corGSM_MM$maxDelta, 0.75))] <- "YES"
+sort(corGSM_MM[corGSM_MM$TFRegulator=="YES",1])
+```
+
+
+```{r}
+#plot the positive TF
+p <- ggplot(data.frame(corGSM_MM), aes(cor, maxDelta, color = TFRegulator)) +
+  geom_point() + 
+  theme_ArchR() +
+  geom_vline(xintercept = 0, lty = "dashed") + 
+  scale_color_manual(values = c("NO"="darkgrey", "YES"="firebrick3")) +
+  xlab("Correlation To Gene Score") +
+  ylab("Max TF Motif Delta") +
+  scale_y_continuous(
+    expand = c(0,0), 
+    limits = c(0, max(corGSM_MM$maxDelta)*1.05)
+  )
+
+p
+```
+
+
+```{r}
+#same from the GeneIntegrationMatrix
+corGIM_MM <- corGIM_MM[order(abs(corGIM_MM$cor), decreasing = TRUE), ]
+corGIM_MM <- corGIM_MM[which(!duplicated(gsub("\\-.*","",corGIM_MM[,"MotifMatrix_name"]))), ]
+corGIM_MM$TFRegulator <- "NO"
+corGIM_MM$TFRegulator[which(corGIM_MM$cor > 0.5 & corGIM_MM$padj < 0.01 & corGIM_MM$maxDelta > quantile(corGIM_MM$maxDelta, 0.75))] <- "YES"
+sort(corGIM_MM[corGIM_MM$TFRegulator=="YES",1])
+```
+
+
+```{r}
+p <- ggplot(data.frame(corGIM_MM), aes(cor, maxDelta, color = TFRegulator)) +
+  geom_point() + 
+  theme_ArchR() +
+  geom_vline(xintercept = 0, lty = "dashed") + 
+  scale_color_manual(values = c("NO"="darkgrey", "YES"="firebrick3")) +
+  xlab("Correlation To Gene Expression") +
+  ylab("Max TF Motif Delta") +
+  scale_y_continuous(
+    expand = c(0,0), 
+    limits = c(0, max(corGIM_MM$maxDelta)*1.05)
+  )
+
+p
+```
+
+
+## Trajectory Analysis with ArchR
+
+To order cells in pseudo-time
+
+ArchR creates cellular trajectories that order cells across a lower N-dimensional subspace within an ArchRProject.
+
+--> Cellular trajectory tnat approximate the differentiation of pro-A to A.
+
+```{r}
+#review clusters and cell types that we defined and stored in cellColData in columns "Clusters" and "Clusters2"
+p1 <- plotEmbedding(ArchRProj = projMulti4, 
+                    colorBy = "cellColData", 
+                    name = "predictedGroup_Un_4", 
+                    embedding = "UMAPHarmony")
+```
+
+```{r}
+#in clusters2
+p2 <- plotEmbedding(ArchRProj = projMulti4, 
+                    colorBy = "cellColData", 
+                    name = "predictedGroup_Un_4", 
+                    embedding = "UMAPHarmony")
+```
+
+```{r}
+ggAlignPlots(p1, p2, type = "h")
+```
+
+
+### Pseudo-time UMAPs and individual feature plots
+
+create a vector of the form: c("cell_state_1", "cell_state_2", "cell_state_3")
+from the definitions stored in "predictedGroup_Un_4"
+
+```{r}
+#print again every unique cell types in "predictedGroup_Un_4"
+unique(projMulti3@cellColData@listData[["predictedGroup_Un_4"]])
+```
+
+
+```{r}
+#define trajectory backbone of cell types to access
+trajectory <- c("Oligodendrocyte precursor cells", "Oligodendrocytes")
+trajectory
+```
+
+
+```{r}
+#add trajectory to project
+#creates a new column in cellColData called "MyeloidU" (name = ...) that stores the pseudo-time value for each cell in the trajectory
+projMulti4 <- addTrajectory(
+    ArchRProj = projMulti4, 
+    name = "Oligodendrocytes", #change name here if desired
+    groupBy = "predictedGroup_Un_4",
+    trajectory = trajectory, 
+    embedding = "UMAPHarmony", 
+    force = TRUE
+)
+```
+
+
+```{r}
+#look at this information (change value of name !!!) 
+head(projMulti4$Oligodendrocytes[!is.na(projMulti4$Oligodendrocytes)])
+```
+
+
+```{r}
+#plot
+#function which overlays the pseudo-time values on our UMAP embedding and displays an arrow approximating the trajectory path from the spline-fit
+p <- plotTrajectory(projMulti4, 
+                    trajectory = "Oligodendrocytes", #change
+                    colorBy = "cellColData", 
+                    name = "Oligodendrocytes",
+                    embedding = "UMAPHarmony") #change
+```
+
+```{r}
+p[[1]]
+```
+
+```{r}
+#save the plot
+#change name accordingly
+plotPDF(p, 
+        name = "Plot-Oligodendrocytes-Traj-UMAP.pdf", 
+        ArchRProj = projMulti4, 
+        addDOC = FALSE, width = 5, height = 5)
+```
+
+
+#### Overlay other features
+
+We can also overlay other features on the trajectory within our UMAP embedding. This allows us to display specific features only within the cells that are relevant to our trajectory.
+
+
+```{r}
+#Then, we can plot the "Oligodendrocytes" trajectory but color the cells by the gene score value of the CEBPB gene
+#change trajectory, name
+p1 <- plotTrajectory(projMulti4, 
+                     trajectory = "Oligodendrocytes", 
+                     colorBy = "GeneExpressionMatrix", 
+                     name = "Kcnd2", #to color specific gene
+                     continuousSet = "horizonExtra",
+                     embedding = "UMAPHarmony")
+```
+
+
+```{r}
+#We can repeat this process but color the cells by their linked gene expression via the GeneIntegrationMatrix
+p2 <- plotTrajectory(projMulti4, 
+                     trajectory = "Oligodendrocytes", 
+                     colorBy = "GeneIntegrationMatrix_db_4", #can change matrix
+                     name = "Kcnd2", 
+                     continuousSet = "blueYellow",
+                     embedding = "UMAPHarmony")
+```
+
+
+The plotTrajectory() function actually returns a list of relevant plots. The first plot in the list is a UMAP embedding, colorized as specified in the function call.
+
+Comparing these UMAP plots side-by-side for the gene score and gene expression, we see that the activity of the CEBPB gene (gene of interest) is highly specific to a type of cells in the later part of the pseudo-time trajectory.
+
+
+```{r}
+ggAlignPlots(p1[[1]], p2[[1]], type = "h")
+```
+
+
+The second plot that is returned by plotTrajectory() is a dot plot of pseudo-time versus the value of the relevant feature, in this case, the gene score or gene expression of the gene. In this case, the cells are colored by their pseudo-time.
+
+```{r}
+ggAlignPlots(p1[[2]], p2[[2]], type = "h")
+```
+
+
+###  Pseudo-time heatmaps
+
+We can visualize changes in many features across pseudo-time using heatmaps. 
+
+We will create these pseudo-time heatmaps for:
+- motifs, 
+- gene scores, 
+- gene expression, 
+- and peak accessibility 
+by passing the corresponding matrix to the useMatrix parameter.
+
+```{r}
+#pseudo-time for motifs
+trajMM  <- getTrajectory(ArchRProj = projMulti4, 
+                         name = "Oligodendrocytes", 
+                         useMatrix = "MotifMatrix", 
+                         log2Norm = FALSE)
+```
+
+
+```{r}
+p1 <- plotTrajectoryHeatmap(trajMM, 
+                            pal = paletteContinuous(set = "solarExtra"))
+```
+
+
+```{r}
+#Pseudo-time for Gene Expression
+trajGSM <- getTrajectory(ArchRProj = projMulti4, 
+                         name = "Oligodendrocytes", 
+                         useMatrix = "GeneExpressionMatrix", 
+                         log2Norm = TRUE)
+```
+
+
+```{r}
+p2 <- trajectoryHeatmap(trajGSM,  pal = paletteContinuous(set = "horizonExtra"))
+```
+
+
+```{r}
+#PSeudo-time for Gene Integration
+trajGIM <- getTrajectory(ArchRProj = projMulti4, 
+                         name = "Oligodendrocytes", 
+                         useMatrix = "GeneIntegrationMatrix_db_4", 
+                         log2Norm = FALSE)
+```
+
+
+```{r}
+p3 <- plotTrajectoryHeatmap(trajGIM,  pal = paletteContinuous(set = "blueYellow"))
+```
+
+
+```{r}
+#pseudo-time for "PeakMatrix"
+trajPM  <- getTrajectory(ArchRProj = projMulti4, 
+                         name = "Oligodendrocytes", 
+                         useMatrix = "PeakMatrix", 
+                         log2Norm = TRUE)
+```
+
+
+```{r}
+p4 <- plotTrajectoryHeatmap(trajPM, pal = paletteContinuous(set = "solarExtra"))
+```
+
+
+```{r}
+#save plots
+plotPDF(p1, p2, p3, p4, 
+        name = "Plot-Oligodendrocytes-Traj-Heatmaps.pdf", 
+        ArchRProj = projMulti4, 
+        addDOC = FALSE, width = 6, height = 8)
+```
+
+
+### Integrative pseudo-time analyses
+
+perform integrative analyses, such as identification of positive TF regulators by integration of gene scores / gene expression with motif accessibility across pseudo-time. 
+
+```{r}
+#find motifs whose accessibility across pseudo-time is correlated with the Gene Expression of the TF gene
+#trajectory at our disposal: trajGSM (GeneScoreMatrix/Expression), trajMM (MotifMatrix), trajGIM (GeneIntegrationMatrix),trajPM (PeakMatrix)
+corGSM_MM <- correlateTrajectories(trajGSM, trajMM, corCutOff = 0.1)
+```
+
+
+```{r}
+corGSM_MM[[1]]
+```
+
+
+```{r}
+#subset our corresponding trajectory SummarizedExperiment objects to only contain the elements that passed significance above
+trajGSM2 <- trajGSM[corGSM_MM[[1]]$name1, ]
+trajMM2 <- trajMM[corGSM_MM[[1]]$name2, ]
+```
+
+
+To best order these features, we can create a new trajectory where the values of these two trajectories are multiplied. This will allow us to create side-by-side heatmaps that are identically ordered by row.
+
+```{r}
+trajCombined <- trajGSM2
+assay(trajCombined, withDimnames=FALSE) <- t(apply(assay(trajGSM2), 1, scale)) + t(apply(assay(trajMM2), 1, scale))
+```
+
+
+```{r}
+#extract the optimal row order from the return of the plotTrajectoryHeatmap() function
+combinedMat <- plotTrajectoryHeatmap(seTrajectory = trajCombined)
+#or used row "trajCombined"
+```
+
+
+```{r}
+#rowOrder <- match(rownames(combinedMat), rownames(trajGSM2))
+rowOrder <- match(rownames(trajCombined), rownames(trajGSM2))
+```
+
+
+we are now ready to create our **paired heatmaps**. First, we will create the heatmap for the gene score trajectory. We specify the desired row order via the rowOrder parameter
+
+```{r}
+#heatmap for Gene Expression Trajectory
+ht1 <- plotTrajectoryHeatmap(trajGSM2,  
+                             pal = paletteContinuous(set = "horizonExtra"),  
+                             varCutOff = 0, 
+                             rowOrder = rowOrder,
+                             force = T)
+```
+
+
+```{r}
+#heatmap for the motif Trajectory
+ht2 <- plotTrajectoryHeatmap(trajMM2, 
+                             pal = paletteContinuous(set = "solarExtra"), 
+                             varCutOff = 0, 
+                             rowOrder = rowOrder)
+```
+
+
+```{r}
+#Plotting these two heatmaps side-by-side, we see that the rows are matched across the two heatmaps.
+ht1 + ht2
+```
+
+
+###########################################
+###########################################
+###########################################
+###########################################
+###########################################
+###########################################
+
+
+Lastly, we will save this project for future reference.
+
+```{r}
+projMulti4 <- saveArchRProject(ArchRProj = projMulti4, outputDirectory = "Save-ProjMulti4", overwrite = TRUE, load = TRUE)
+```
+
+
+###########################################
+###########################################
+###########################################
+###########################################
+###########################################
+###########################################
+
+
+
+
+
+
+
+
+
+
+
