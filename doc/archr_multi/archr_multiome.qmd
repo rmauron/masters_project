@@ -11,26 +11,19 @@ format:
 ---
 
 # Pipeline for multiomics analysis
-Meaning that snATAC-seq and snRNA-seq from the same cells are available.
-The cells are likely not labeled.
+snATAC-seq and snRNA-seq from the same cells are available.
+The cells are not labeled.
+
 
 ## Links
 Mainly from: https://github.com/GreenleafLab/ArchR_Website/blob/ui_updates/bookdown/21_MultiomicDataAnalysis.Rmd
 and: https://www.archrproject.com/bookdown/getting-started-with-archr.html
 
 
-Text from the authors:
-"
-This chapter provides an overview of how to analyze multiomic data in ArchR. For clarity, when we say "multiomic data", what we are really talking about is ATAC-seq and RNA-seq acquired from the same single cells using the 10x Genomics platform. Our hope is to eventually generalize the infrastructure and workflows here to arbitrary multiomic data types and platforms but given that the vast majority of use cases focus specifically on the 10x Multiome kit, that is the first implementation we have made.
-
-Importantly, this chapter is not meant to serve as the only thing you read if you are a new ArchR user starting with Multiome data. Instead, you should read the full manual from the start. This chapter really just shows how to work with Multiome data and load it into the ArchR ecosystem. It does not provide details on all of the other capabilities of ArchR and how to properly use them."
-
-
 ## Importing data and setting up a Multiome project
 
-First, it is worth noting that the datasets used in this chapter are different from the datasets used in the other chapters and we will be creating a new `ArchRProject` here. For this reason, and to make this chapter a standalone, we will repeat operations from other parts of the manual.
 
-Lets start by loading ArchR and setting up our genome (`hg38` in this case), our threads (which are system dependent so you should change that based on your computational resources), and our random seed.
+loading ArchR, setting up our genome (`hg38`, `mm10`, ...), threads (which are system dependent so you should change that based on your computational resources), and our random seed (produce same set of random numbers).
 
 ```{r}
 library(ArchR)
@@ -38,13 +31,6 @@ library(ArchR)
 addArchRGenome("mm10") #for mouse
 addArchRThreads(32) #rocommended 1/2 of total available cores
 set.seed(1)
-```
-
-
-We can download the files associated with the multiome tutorial just like we did for the main tutorial but using `tutorial = "Multiome"`.
-
-```{r}
-#inputFiles <- getTutorialData(tutorial = "Multiome")
 ```
 
 
@@ -71,7 +57,8 @@ names(inputFiles) <- c("CF1",
 ```
 
 
-If we inspect `inputFiles` you can see that we have a `.fragments.tsv.gz` file and a `filtered_feature_bc_matrix.h5` file for each sample. These two files are both standard outputs of the 10x Genomics `cellranger-arc` pipeline.
+If we inspect `inputFiles` you can see that we have a `.fragments.tsv.gz` file for each sample. 
+These files are outputs of the 10x Genomics `cellranger-arc` pipeline.
 
 ```{r}
 #check the inputs
@@ -79,36 +66,9 @@ inputFiles
 ```
 
 
-The first thing we need to do is separate out the scATAC-seq input files from the scRNA-seq input files. Here, we are doing that using `grep()` but you can also do it manually however you want. The important thing is to end up with a named vector of files corresponding to the scATAC-seq data and a named vector of files corresponding to the scRNA-seq data __and that the names of the corresponding samples match__! 
-
-```{r}
-#If you use the mock dataset from autors, you can split ATAC and RNA files here. If you insert your own data, follow the script.
-
-# atacFiles <- inputFiles[grep(pattern = "\\.fragments.tsv.gz$", x = inputFiles)]
-# rnaFiles <- inputFiles[grep(pattern = "\\.filtered_feature_bc_matrix.h5$", x = inputFiles)]
-```
-
-
-For clarity, the above code is the same as doing this manually:
-
-```{r}
-# atacFiles <- c("pbmc_sorted_3k" = "Multiome/pbmc_sorted_3k.fragments.tsv.gz", "pbmc_unsorted_3k" = "Multiome/pbmc_unsorted_3k.fragments.tsv.gz")
-# rnaFiles <- c("pbmc_sorted_3k" = "Multiome/pbmc_sorted_3k.filtered_feature_bc_matrix.h5", "pbmc_unsorted_3k" = "Multiome/pbmc_unsorted_3k.filtered_feature_bc_matrix.h5")
-```
-
-
-You can see that the names in these vectors match which is what will be used to link the files together upon import.
-
-```{r}
-# names(atacFiles)
-# names(rnaFiles)
-# all.equal(names(atacFiles), names(rnaFiles))
-```
-
-
 ## Create Arrow Files & Project
 
-As in the main tutorial, the first step is to create ArrowFiles from the scATAC-seq fragment files.
+create ArrowFiles from the scATAC-seq fragment files
 
 ```{r}
 ArrowFiles <- createArrowFiles(
@@ -123,8 +83,10 @@ ArrowFiles <- createArrowFiles(
 
 
 Note: At this stage, in the working directory figures a repository containing quality control plot for each sample passed.
+./QualityControl/ --> QC plots
 
-Then we create an `ArchRProject` object from those ArrowFiles
+
+create an `ArchRProject` object from those ArrowFiles
 
 ```{r}
 projMulti1 <- ArchRProject(ArrowFiles = ArrowFiles)
@@ -133,7 +95,15 @@ projMulti1 <- ArchRProject(ArrowFiles = ArrowFiles)
 
 ## Importing snRNA-seq
 
-Now that we've handled the scATAC-seq data, we turn out attention to the scRNA-seq data. ArchR provides the `import10xFeatureMatrix()` function which will perform this automatically for all of the `filtered_feature_bc_matrix.h5` files in your data set. While this process may seem straightforward, there are a few things going on under-the-hood which are important to understand. First, the `filtered_feature_bc_matrix.h5` created by `cellranger-arc` are not always perfectly matched across samples. For example, ArchR will throw an error if your various scRNA-seq input files do not match based on the gene names or the metadata columns because we view this as an unforseen incompatibility between data, potentially caused by alignment to different reference genomes or something similar. There are also more permissible mismatches that occur across these input files. Relatively frequently, the transcript-level data that is associated with each gene can vary slightly across samples for reasons that aren't completely clear. For more information, see [this post](https://github.com/GreenleafLab/ArchR/issues/507#issuecomment-1063139673). Because of this, you have to decide what to do when these minor conflicts arise. We provide two options which are controlled by the `strictMatch` parameter. If you want to try to keep the genes with mis-matched metadata information, set `strictMatch = FALSE` which will coerce all samples to match the metadata information of the first sample from your `input`. Alternatively, if you would prefer to remove genes whose metadata is mis-matched across samples, you can set `strictMatch = TRUE` which will remove the offending genes from all samples. This is often a very small number of genes so it is unlikely to affect your analysis either way.
+`import10xFeatureMatrix()` function which integrate the `filtered_feature_bc_matrix.h5` files
+
+`filtered_feature_bc_matrix.h5` created by `cellranger-arc` are not always perfectly matched across samples
+ArchR throws an error if your various scRNA-seq input files do not match based on the gene names or the metadata columns because we view this as an unforseen incompatibility between data, potentially caused by alignment to different reference genomes or something similar. 
+
+We provide two options which are controlled by the `strictMatch` parameter. 
+
+- `strictMatch = FALSE` which will coerce all samples to match the metadata information of the first sample from your `input`. 
+- `strictMatch = TRUE` which will remove the offending genes from all samples.
 
 ```{r}
 #create an ArchR object containing the RNA data.
@@ -218,32 +188,6 @@ p_multi_frags
 ```
 
 
-In this tutorial data, there actually aren't any examples of this transcript-level metadata mismatch. But if there were, ArchR would output warnings to tell you about the genes that were being excluded or coerced. However, what you do see is a warning that some of the features (genes) did not have an "interval" (or genomic location) present in the 10x input file. This is most frequently the case for genes encoded on the mitochondrial DNA but could in theory happen for other genes in other species as well. This causes problems for ArchR because we assume that every gene has a position in the genome. To get around this problem, ArchR will default to assigning these genes a fake genomic position on "chrNA". All of these genes will then get excluded from downstream analyses. If you want to rescue these genes, then you must provide this information via the `features` parameter. This is most easily done using an Ensembl database object from BioConductor. The below code assumes that you have installed the `EnsDb.Hsapiens.v86` package from BioConductor.
-
-```{r}
-# library(EnsDb.Hsapiens.v86)
-# seRNA <- import10xFeatureMatrix(
-#   input = rnaFiles,
-#   names = names(rnaFiles),
-#   strictMatch = TRUE,
-#   features = genes(EnsDb.Hsapiens.v86)
-# )
-```
-
-
-After supplying the genes to the `features` param, you can see that all of the genes encoded on the mitochondrial genome are rescued.
-
-The next thing that we want to do is add this scRNA-seq data to our `ArchRProject` via the `addGeneExpressionMatrix()` function. 
-
-However, there is some tidying up that we need to do before we are ready to do that. Inherent in how the multiomic data is generated, you will likely have cells that pass scRNA-seq quality control but not scATAC-seq quality control and vice versa. This can cause problems downstream with other ArchR functions that expect every cell to have every data type. For example, if you were to add gene expression data for only a subset of cells and then try to perform `addIterativeLSI()` on the corresponding `GeneExpressionMatrix`, ArchR would not know what to do with the cells that were missing data in the `GeneExpressionMatrix`. Because our `ArchRProject` is anchored in the scATAC-seq data, we first check to see how many cells in our project (the ones that have passed scATAC-seq quality control) are not also in our scRNA-seq data
-
-```{r}
-length(which(getCellNames(projMulti1) %ni% colnames(seRNA)))
-```
-
-
-Though not many cells in this case, we need to remove these cells from our project before proceeding. We do this using the `subsetArchRProject()` function and saving this as a new `ArchRProject` called `projMulti2`. Again, this removal isn't explicitly necessary but there are downstream ArchR functions that could break if all cells dont have both data types so the safest thing to do is remove them.
-
 ```{r}
 #save project since we will change project now
 saveArchRProject(ArchRProj = projMulti1, outputDirectory = "Save-ProjMulti1", load = F)
@@ -257,6 +201,15 @@ saveArchRProject(ArchRProj = projMulti1, outputDirectory = "Save-ProjMulti1", lo
 ```
 
 
+check to see how many cells in our project (the ones that have passed scATAC-seq quality control) are not also in our scRNA-seq data
+
+```{r}
+length(which(getCellNames(projMulti1) %ni% colnames(seRNA)))
+```
+
+
+remove these cells from our project. We do this using the `subsetArchRProject()` function and saving this as a new `ArchRProject` called `projMulti2`.
+
 ```{r}
 cellsToKeep <- which(getCellNames(projMulti1) %in% colnames(seRNA))
 projMulti2 <- subsetArchRProject(
@@ -266,8 +219,9 @@ projMulti2 <- subsetArchRProject(
     force = TRUE)
 ```
 
+The next thing that we want to do is add this scRNA-seq data to our `ArchRProject` via the `addGeneExpressionMatrix()` function. 
 
-Finally, we are ready to add the gene expression data to our project. You'll notice here another parameter called `strictMatch`. When `strictMatch = TRUE`, this will ensure that all cells in the `ArchRProject` are also represented in the `seRNA` object. This is a nice fail-safe to make sure that the above project subsetting went smoothly. If `strictMatch = FALSE` (the default), then this function will merely throw a warning telling you that not all of your cells have scRNA-seq information and that this could cause problems downstream.
+When `strictMatch = TRUE`, this will ensure that all cells in the `ArchRProject` are also represented in the `seRNA` object. This is a nice fail-safe to make sure that the above project subsetting went smoothly. If `strictMatch = FALSE` (the default), then this function will merely throw a warning telling you that not all of your cells have scRNA-seq information and that this could cause problems downstream.
 
 ```{r}
 #adding the RNA data to the project together with the ATAC data
@@ -294,14 +248,9 @@ cat("A total of", nCells(projMulti1)-nCells(projMulti2), "doublets were removed.
 
 ## Analysis of multiome data in ArchR
 
-With our multiome project created, we're now ready to start analysis. It is worth mentioning that the analyses below aren't altogether different from the analyses presented in the rest of the full manual. Because of the inclusion of gene scores, ArchR was already performing analyses that leveraged gene-level information and scATAC-seq information. 
-
-The primary difference between ATAC-only analysis and multiomic analysis is that we are using the **`GeneExpressionMatrix`** instead of the **`GeneScoreMatrix`**.
-
-
 ### Dimensionality reduction (point 4 in manual)
 
-The first thing we will do is perform dimensionality reduction using `addIterativeLSI()`. We can do this on the scATAC-seq data via the `TileMatrix` and on the scRNA-seq data via the `GeneExpressionMatrix`.
+perform dimensionality reduction using `addIterativeLSI()`. We can do this on the scATAC-seq data via the `TileMatrix` and on the scRNA-seq data via the `GeneExpressionMatrix`.
 
 LSI = Latent Semantic Indexing
 
@@ -315,7 +264,7 @@ projMulti2 <- addIterativeLSI(
     n.start = 10
   ),
   saveIterations = FALSE,
-  useMatrix = "TileMatrix", 
+  useMatrix = "TileMatrix",
   depthCol = "nFrags",
   name = "LSI_ATAC"
 )
@@ -342,7 +291,8 @@ projMulti2 <- addIterativeLSI(
 ```
 
 
-We can also create a dimensionality reduction that uses information from both the scATAC-seq and scRNA-seq data. We will name this `reducedDims` object "LSI_Combined".
+create a dimensionality reduction that uses information from both the scATAC-seq and scRNA-seq data. 
+We will name this `reducedDims` object "LSI_Combined".
 
 ```{r}
 #LSI from both ATAC and RNA
