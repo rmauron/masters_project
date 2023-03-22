@@ -133,14 +133,15 @@ seRNA <- import10xFeatureMatrix(
 ```{r}
 nCells_df <- data.frame(sample = projMulti1@cellColData@listData[["Sample"]]@values,
                         nCells = projMulti1@cellColData@listData[["Sample"]]@lengths)
-nCells_df
+nCells_df[order(nCells_df$sample),]
 ```
 
 
 ```{r}
 ggplot(nCells_df,
        aes(x = sample, y = nCells)) +
-    geom_bar(stat = "identity")
+    geom_bar(stat = "identity")+
+    ggtitle("Number of cells per sample")
 ```
 
 
@@ -187,15 +188,44 @@ p_multi_frags
 #rm(p_frags, p_multi_frags, p_TSS)
 ```
 
+
 ## Create subgroups by condition
 
 ```{r}
+#Have to know how to "group" the samples. Here, we want to remove the numbers after CF1,2,7 or CG8,9 
 bioNames <- gsub("0|1|2|3|4|5|6|7|8|9","", projMulti1$Sample)
 unique(bioNames)
 projMulti1$Conditions <- bioNames
 ```
 
+```{r}
+p_frags <- plotGroups(
+    projMulti1,
+    groupBy = "Conditions",
+    colorBy = "cellColData",
+    name = "nFrags",
+    plotAs = "violin",
+    alpha = 0.4,
+    addBoxPlot = T,
+    log = F
+)
+p_frags
+```
 
+
+```{r}
+nCells_conditions <- data.frame(sample = projMulti1@cellColData@listData[["Conditions"]]@values,
+                        nCells = projMulti1@cellColData@listData[["Conditions"]]@lengths)
+
+nCells_conditions[order(nCells_conditions$sample),] #order the df before printing it
+```
+
+```{r}
+ggplot(nCells_conditions,
+       aes(x = sample, y = nCells)) +
+    geom_bar(stat = "identity") +
+    ggtitle("Number of cells per condition")
+```
 
 ```{r}
 #save project since we will change project now
