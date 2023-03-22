@@ -187,6 +187,15 @@ p_multi_frags
 #rm(p_frags, p_multi_frags, p_TSS)
 ```
 
+## Create subgroups by condition
+
+```{r}
+bioNames <- gsub("0|1|2|3|4|5|6|7|8|9","", projMulti1$Sample)
+unique(bioNames)
+projMulti1$Conditions <- bioNames
+```
+
+
 
 ```{r}
 #save project since we will change project now
@@ -469,8 +478,6 @@ plotPDF(p1, p2, name = "Harmony-Combined-sample-clusters", addDOC = FALSE)
 
 ```{r}
 #include your marker gene list here
-#specific list of gene to label
-
 my_markers <- c(
     "Kcnd2", 
     "Olfm3",
@@ -522,7 +529,7 @@ my_markers <- c(
     "Mef2c",
     "C9orf72",
     "Pax6",
-    "Top2a",
+    #"Top2a",
     "Vim",
     "Sox9",
     "Igfbp7",
@@ -545,30 +552,29 @@ my_markers <- c(
     "Agt",
     "Apoe",
     #Neurodegenerative disease marker
-    
-"CD33",
-"PSEN1",
-"PSEN2",
-"TREM2",
-"GBA",
-"LRRK2",
-"PINK1",
-"UCHL1",
-"VPS35",
-"C9orf72",
-"FUS",
-"SOD1",
-"SQSTM1",
+    "CD33",
+    "PSEN1",
+    "PSEN2",
+    "TREM2",
+    "GBA",
+    "LRRK2",
+    "PINK1",
+    "UCHL1",
+    "VPS35",
+    "C9orf72",
+    "FUS",
+    "SOD1",
+    "SQSTM1",
 
 
-"TYROBP",
-"P2RY12",
-"CX3CR1",
-"TMEM119",
+    "TYROBP",
+    "P2RY12",
+    "CX3CR1",
+    "TMEM119",
 
-"Axl",
-"CST7",
-"Spp1"
+    "Axl",
+    "CST7",
+    "Spp1"
 )
 
 my_markers <- unique(my_markers)
@@ -576,8 +582,6 @@ my_markers <- unique(my_markers)
 
 
 ### Tweak and bias correction for multiome data
-
-There are, of course, some aspects of the analysis which you should tweak when using *multiome data*. One such example is the `bias` argument to `getMarkerFeatures()` which can be tweaked to account for both scATAC-seq data quality (`"TSSEnrichment`) and read depth for both assays (`"log10(nFrags)"` for scATAC-seq and `"log10(Gex_nUMI)"` for scRNA-seq).
 
 ```{r}
 #bias correction
@@ -592,9 +596,9 @@ se <- getMarkerFeatures(ArchRProj = projMulti2,
 heatmap_gex <- plotMarkerHeatmap(
   seMarker = se, 
   cutOff = "FDR <= 0.01 & Log2FC >= 0.5",
-  #nPrint = 15, #max number of gene to print per cluster
+  #nPrint = 5, #max number of gene to print per cluster
   transpose = T,
-  labelMarkers = my_markers
+  labelMarkers = c("Gba", "Lrrk2", "Pink1", "Uchl1", "Vps35")#specify the markers you want a label on
   )
 
 draw(heatmap_gex, heatmap_legend_side = "bot", annotation_legend_side = "bot")
@@ -617,22 +621,6 @@ Need to find a way to sort the best marker genes...
 #list of some markers 
 markerList <- getMarkers(se, cutOff = "FDR <= 0.01 & Log2FC >= 1.25") 
 markerList$C6 #change cluster here
-
-
-##print top 20 marker genes per cluster
-# for (cluster in 1: length(markerList)) {
-#     df_markers <- data.frame(genes = markerList@listData[[cluster]]@listData[["name"]],
-#                          MeanDiff = markerList@listData[[cluster]]@listData[["MeanDiff"]])
-#     df_markers_order <- df_markers[order(-df_markers$MeanDiff),]
-#     print(top_n(df_markers_order["genes"], 20))
-#     
-#     list_10 <- c(top_n(df_markers_order["genes"], 10))
-#     
-#     my_df_by_cluster <- data.frame(Cluster = cluster)
-#     my_df_by_cluster <- cbind(my_df_by_cluster, list_10)
-# }
-# 
-# my_df_by_cluster
 ```
 
 
@@ -1640,16 +1628,17 @@ plotPDF(plotVarDev, name = "Variable-Motif-Deviation-Scores", width = 5, height 
 
 ```{r}
 #to analyze subset of features
-motifs <- c("Smarcc1", #from list above
-                 "Fos",
-                 "Bach1",
-                 "Msc", #C1
-                 "Neurod2", #C2
-                 "Neurod4", #C3
-                 "Neurog1", #C4
-                 "Sfpi1", #C6
-                 "Neurod1" #C7
-                 ) #specify motifs here
+# motifs <- c("Smarcc1", #from list above
+#                  "Fos",
+#                  "Bach1",
+#                  "Msc", #C1
+#                  "Neurod2", #C2
+#                  "Neurod4", #C3
+#                  "Neurog1", #C4
+#                  "Sfpi1", #C6
+#                  "Neurod1" #C7
+#                  ) #specify motifs here
+motifs <- my_markers
 markerMotifs <- getFeatures(projMulti4, select = paste(motifs, collapse="|"), useMatrix = "MotifMatrix")
 markerMotifs
 ```
