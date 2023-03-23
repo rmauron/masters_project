@@ -436,12 +436,19 @@ p1
 
 p2 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Clusters_Combined", embedding = "UMAP_Combined")
 p2
+
+p3 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Conditions", embedding = "UMAP_Combined", alpha = 0.5, pal = c("CF" = "white","CG" = "green"))
+p3
+p4 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Conditions", embedding = "UMAP_Combined", alpha = 0.5, pal = c("CF" = "blue","CG" = "white"))
+p4
+p5 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Conditions", embedding = "UMAP_Combined", alpha = 0.35, pal = c("CF" = "blue","CG" = "green"))
+p5
 ```
 
 
 ```{r}
 #save plot
-plotPDF(p1, p2, name = "UMAP-Combined-sample-clusters", addDOC = FALSE)
+plotPDF(p1, p2, p3, p4, p5, name = "UMAP-Combined-sample-clusters", addDOC = FALSE)
 ```
 
 
@@ -492,8 +499,29 @@ p2 <- plotEmbedding(ArchRProj = projMulti2,
                     name = "Clusters_Combined", 
                     embedding = "UMAPHarmony")
 
+p3 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Conditions", 
+                    embedding = "UMAPHarmony",
+                     alpha = 0.35, pal = c("CF" = "blue","CG" = "green")
+                    )
+p4 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Conditions", 
+                    embedding = "UMAPHarmony",
+                     alpha = 0.35, pal = c("CF" = "white","CG" = "green")
+                    )
+p5 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Conditions", 
+                    embedding = "UMAPHarmony",
+                     alpha = 0.35, pal = c("CF" = "blue","CG" = "white")
+                    )
 p1
 p2
+p3
+p4
+p5
 ```
 
 ```{r}
@@ -540,71 +568,71 @@ my_markers <- c(
     "Nr2f6",
     "Hic1",
     "Sox6",
-    "Gfap",
-    "Ppp1r17",
-    "Eomes",
-    "Neurod2",
-    "Dlx2",
-    "Hes1",
-    "Limch1",
-    "Runx1",
-    "Sncb",
-    "Dok5",
-    "Jun",
-    "Fos",
-    "Klf16",
-    "Sp1",
-    "Sp2",
-    "Ascl1",
-    "Mef2c",
-    "C9orf72",
-    "Pax6",
-    #"Top2a",
-    "Vim",
-    "Sox9",
-    "Igfbp7",
-    "Aqp4",
-    "Fezf2",
-    "Nfib",
-    "Lhx6",
-    "Gad1",
-    "Neurod6",
-    "Syt1",
-    "Cntn2",
-    "Pcdh20",
-    "Myt1l",
-    "Plxnd1",
-    "Camk2b",
-    "Shank2",
-    "Ncam1",
-    "Ccnd1",
-    "Otx2",
-    "Agt",
-    "Apoe",
-    #Neurodegenerative disease marker
-    "CD33",
-    "PSEN1",
-    "PSEN2",
-    "TREM2",
+    # "Gfap",
+    # "Ppp1r17",
+    # "Eomes",
+    # "Neurod2",
+    # "Dlx2",
+    # "Hes1",
+    # "Limch1",
+    # "Runx1",
+    # "Sncb",
+    # "Dok5",
+    # "Jun",
+    # "Fos",
+    # "Klf16",
+    # "Sp1",
+    # "Sp2",
+    # "Ascl1",
+    # "Mef2c",
+    # "C9orf72",
+    # "Pax6",
+    # #"Top2a",
+    # "Vim",
+    # "Sox9",
+    # "Igfbp7",
+    # "Aqp4",
+    # "Fezf2",
+    # "Nfib",
+    # "Lhx6",
+    # "Gad1",
+    # "Neurod6",
+    # "Syt1",
+    # "Cntn2",
+    # "Pcdh20",
+    # "Myt1l",
+    # "Plxnd1",
+    # "Camk2b",
+    # "Shank2",
+    # "Ncam1",
+    # "Ccnd1",
+    # "Otx2",
+    # "Agt",
+    # "Apoe",
+    # #Neurodegenerative disease marker
+    # "CD33",
+    # "PSEN1",
+    # "PSEN2",
+    # "TREM2",
     "GBA",
     "LRRK2",
     "PINK1",
     "UCHL1",
-    "VPS35",
-    "C9orf72",
-    "FUS",
-    "SOD1",
-    "SQSTM1",
-
-
-    "TYROBP",
-    "P2RY12",
-    "CX3CR1",
-    "TMEM119",
-
-    "Axl",
-    "CST7",
-    "Spp1"
+    "VPS35"
+    # "C9orf72",
+    # "FUS",
+    # "SOD1",
+    # "SQSTM1",
+    # 
+    # 
+    # "TYROBP",
+    # "P2RY12",
+    # "CX3CR1",
+    # "TMEM119",
+    # 
+    # "Axl",
+    # "CST7",
+    # "Spp1"
 )
 
 my_markers <- unique(my_markers)
@@ -614,6 +642,8 @@ my_markers <- unique(my_markers)
 ### Tweak and bias correction for multiome data
 
 ```{r}
+#| message: false
+
 #bias correction
 se <- getMarkerFeatures(ArchRProj = projMulti2,
                         groupBy = "Clusters_Combined",
@@ -646,7 +676,6 @@ plotPDF(heatmap_gex,
 
 
 ### Get marker genes
-Need to find a way to sort the best marker genes...
 ```{r}
 #list of some markers 
 markerList <- getMarkers(se, cutOff = "FDR <= 0.01 & Log2FC >= 1.25") 
@@ -746,6 +775,7 @@ plotPDF(plotList = p,
 ### Track Plotting (point 7.6 in manual)
 
 ```{r}
+#| message: false
 p <- plotBrowserTrack(
     ArchRProj = projMulti2, 
     groupBy = "Clusters_Combined", 
@@ -753,13 +783,6 @@ p <- plotBrowserTrack(
     upstream = 50000,
     downstream = 50000
 )
-```
-
-
-```{r}
-#plot the coverage of selected marker among the clusters
-grid::grid.newpage()
-grid::grid.draw(p$Tenm1) #select cluster here
 ```
 
 
