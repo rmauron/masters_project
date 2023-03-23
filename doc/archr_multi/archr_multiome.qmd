@@ -852,15 +852,8 @@ saveArchRProject(ArchRProj = projMulti2, outputDirectory = "Save-ProjMulti2", lo
 ```
 
 ## Annotate cells (point 8 in manual)
-(Similar to Jakub's script in chapter 6 of his document.)
 
-Since we don't have our cells labeled, we need to infer their origin from the clusters we have and a the http://mousebrain.org database:
-
-"""
-path to reference genome:
-/Users/raphaelmauron/archr_rr3/data-raw/ref_data/mousebrain_tax4_subsampled.Rds
-"""
-
+Since we don't have our cells labeled, we need to infer their origin from the clusters we have and the http://mousebrain.org database:
 
 ### Integration of db
 Done in the way the authors integrate RNA (when snATAC-seq is not from multiome analysis (snATAC + snRNA)).
@@ -868,7 +861,11 @@ Done in the way the authors integrate RNA (when snATAC-seq is not from multiome 
 Here integrate database which will allow to annotate each cells by running probability compared to the *GeneExpressionMatrix* we have from our own snRNA-seq.
 
 ```{r}
-#loading the database file in seurat format
+#| message: false
+#| warning: false
+#| output: false
+
+#loading the database file in seurat format (.Rds)
 
 #setwd("/Users/raphaelmauron/archr_rr3/data-raw/ref_data/mousebrain_tax4_subsampled.Rds")
 
@@ -878,25 +875,31 @@ se_RNA_mousebrain_data
 
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #check requirement for seurat object before integration
 #1
 "RNA" %in% names(se_RNA_mousebrain_data@assays)
 
-#2 all the cell types found in the database just linked:
-#colnames(se_RNA_mousebrain_data@meta.data)
-unique(se_RNA_mousebrain_data@meta.data$TaxonomyRank4)
+#2 all the cell types found our sample:
+unique(se_RNA_mousebrain_data@meta.data$TaxonomyRank3)
 ```
 
 
-!!! Here need to find a way to add matrix for TaxRank 1-4 in the same projMulti3...
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #unconstrained method (8.1.1 in manual)
 #TaxonomyRank1
 projMulti3 <- addGeneIntegrationMatrix(
     ArchRProj = projMulti2, 
     useMatrix = "GeneExpressionMatrix",
     matrixName = "GeneIntegrationMatrix_db_1",
-    reducedDims = "LSI_Combined", # can we do "Harmony" here??? We should..
+    reducedDims = "Harmony", #"LSI_Combined",
     seRNA = se_RNA_mousebrain_data,
     addToArrow = FALSE,
     groupRNA = "TaxonomyRank1",
@@ -927,12 +930,16 @@ p1_1
 
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #TaxonomyRank2
 projMulti3 <- addGeneIntegrationMatrix(
     ArchRProj = projMulti2, 
     useMatrix = "GeneExpressionMatrix",
     matrixName = "GeneIntegrationMatrix_db_2",
-    reducedDims = "LSI_Combined", # can we do "Harmony" here??? We should..
+    reducedDims = "Harmony", #"LSI_Combined"
     seRNA = se_RNA_mousebrain_data,
     addToArrow = FALSE,
     groupRNA = "TaxonomyRank2",
@@ -954,12 +961,16 @@ p2
 
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #TaxonomyRank3
 projMulti3 <- addGeneIntegrationMatrix(
     ArchRProj = projMulti2, 
     useMatrix = "GeneExpressionMatrix",
     matrixName = "GeneIntegrationMatrix_db_3",
-    reducedDims = "LSI_Combined", # can we do "Harmony" here??? We should..
+    reducedDims = "Harmony", #"LSI_Combined"
     seRNA = se_RNA_mousebrain_data,
     addToArrow = FALSE,
     groupRNA = "TaxonomyRank3",
@@ -981,12 +992,16 @@ p3
 
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #TaxonomyRank4
 projMulti3 <- addGeneIntegrationMatrix(
     ArchRProj = projMulti2, 
     useMatrix = "GeneExpressionMatrix",
     matrixName = "GeneIntegrationMatrix_db_4",
-    reducedDims = "Harmony", # can we do "Harmony" here??? We should..LSI_Combined
+    reducedDims = "Harmony", #"LSI_Combined"
     seRNA = se_RNA_mousebrain_data,
     addToArrow = FALSE,
     groupRNA = "TaxonomyRank4",
@@ -1026,39 +1041,40 @@ saveArchRProject(ArchRProj = projMulti3, outputDirectory = "Save-ProjMulti3", lo
 
 ```{r}
 #load the project from last saved project (if necessary)
-library(ArchR)
-projMulti3 <- loadArchRProject(path = "./Save-ProjMulti3", force = FALSE, showLogo = TRUE)
+# library(ArchR)
+# projMulti3 <- loadArchRProject(path = "./Save-ProjMulti3", force = FALSE, showLogo = TRUE)
 ```
 
 
 ```{r}
-#add cell annotation to ArrowFiles & create new project
+#| message: false
+#| warning: false
+#| output: false
+
+#add cell annotation to ArrowFiles & create new project (can choose between the taxonomy 1-4)
 projMulti4 <- addGeneIntegrationMatrix(
     ArchRProj = projMulti3, 
     useMatrix = "GeneExpressionMatrix",
-    matrixName = "GeneIntegrationMatrix_db_4",
+    matrixName = "GeneIntegrationMatrix_db_3",
     reducedDims = "LSI_Combined",
     seRNA = se_RNA_mousebrain_data,
     addToArrow = TRUE, #rerun previous chunk but now add the cell annotation
     force = TRUE, #to allow rerun
-    groupRNA = "TaxonomyRank4",
-    nameCell = "predictedCell_Un_4",
-    nameGroup = "predictedGroup_Un_4",
-    nameScore = "predictedScore_Un_4"
+    groupRNA = "TaxonomyRank3",
+    nameCell = "predictedCell_Un_3",
+    nameGroup = "predictedGroup_Un_3",
+    nameScore = "predictedScore_Un_3"
 )
-```
-
-
-```{r}
-#check available matrices in the project. The latest name passed through "matrixName" should figure below. 
-#At this stage we don't have "PeakMatrix" yet
-getAvailableMatrices(projMulti4) 
 ```
 
 
 ## Calling Peaks (point 9 & 10 in manual)
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #add coverage (point 9 in manual)
 projMulti4 <- addGroupCoverages(
     ArchRProj = projMulti4, 
@@ -1087,7 +1103,7 @@ p2g[[1]]
 
 
 ```{r}
-#check again the matrices available in the project. Should get "PeakMatrix"
+#check the available matrices in the project. Should get "PeakMatrix"
 getAvailableMatrices(projMulti4) 
 ```
 
