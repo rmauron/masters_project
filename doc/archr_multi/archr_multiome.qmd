@@ -352,7 +352,6 @@ projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_Combined", name = "UMAP_Com
 
 
 ### Clustering (point 5 from manual)
-**Note that here it doesn't matter whether point 5 or 6 is performed first.**
 
 And then call clusters for each.
 
@@ -537,21 +536,22 @@ plotPDF(p1, p2, name = "Harmony-Combined-sample-clusters", addDOC = FALSE)
 ```{r}
 #include your marker gene list here
 my_markers <- c(
-    "Kcnd2", 
-    "Olfm3",
-    "Tenm1",
-    "Zfp36l2", 
-    "Pacrg", 
-    "Rnf220", 
-    "Zbtb16",
-    "Cbln1", 
-    "Neurod1",
-    "Il1rl2", 
-    "Cldn11", 
-    "Cyp27a1", 
-    "E330020D12Rik", 
-    "Tfap2b",
-    "Wfs1",
+    # "Kcnd2", #Jakub markers
+    # "Olfm3",
+    # "Tenm1",
+    # "Zfp36l2", 
+    # "Pacrg", 
+    # "Rnf220", 
+    # "Zbtb16",
+    # "Cbln1", 
+    # "Neurod1",
+    # "Il1rl2", 
+    # "Cldn11", 
+    # "Cyp27a1", 
+    # "E330020D12Rik", 
+    # "Tfap2b",
+    
+    "Wfs1", # RR3 markers
     "Dkk3",
     "Prox1",
     "Egfr",
@@ -568,6 +568,7 @@ my_markers <- c(
     "Nr2f6",
     "Hic1",
     "Sox6",
+    
     # "Gfap",
     # "Ppp1r17",
     # "Eomes",
@@ -614,7 +615,7 @@ my_markers <- c(
     # "PSEN1",
     # "PSEN2",
     # "TREM2",
-    "GBA",
+    "GBA", #Parkinson markers
     "LRRK2",
     "PINK1",
     "UCHL1",
@@ -634,7 +635,6 @@ my_markers <- c(
     # "CST7",
     # "Spp1"
 )
-
 my_markers <- unique(my_markers)
 ```
 
@@ -643,6 +643,9 @@ my_markers <- unique(my_markers)
 
 ```{r}
 #| message: false
+#| warning: false
+#| output: false
+
 
 #bias correction
 se <- getMarkerFeatures(ArchRProj = projMulti2,
@@ -658,7 +661,7 @@ heatmap_gex <- plotMarkerHeatmap(
   cutOff = "FDR <= 0.01 & Log2FC >= 0.5",
   #nPrint = 5, #max number of gene to print per cluster
   transpose = T,
-  labelMarkers = c("Gba", "Lrrk2", "Pink1", "Uchl1", "Vps35")#specify the markers you want a label on
+  labelMarkers = my_markers #c("Gba", "Lrrk2", "Pink1", "Uchl1", "Vps35")#specify the markers you want a label on
   )
 
 draw(heatmap_gex, heatmap_legend_side = "bot", annotation_legend_side = "bot")
@@ -677,6 +680,9 @@ plotPDF(heatmap_gex,
 
 ### Get marker genes
 ```{r}
+#| message: false
+#| warning: false
+
 #list of some markers 
 markerList <- getMarkers(se, cutOff = "FDR <= 0.01 & Log2FC >= 1.25") 
 markerList$C6 #change cluster here
@@ -686,6 +692,10 @@ markerList$C6 #change cluster here
 ### Visualizing Marker Genes on an Embedding
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 p <- plotEmbedding(
     ArchRProj = projMulti2,
     colorBy = "GeneExpressionMatrix",
@@ -698,6 +708,10 @@ p <- plotEmbedding(
 
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #plot 1 embedding per selected genes
 p <- lapply(p, function(x){
     x + guides(color = FALSE, fill = FALSE) + 
@@ -710,7 +724,9 @@ p <- lapply(p, function(x){
         axis.ticks.y=element_blank()
     )
 })
-do.call(cowplot::plot_grid, c(list(ncol = 1),p))
+
+#uncomment to plot here, but might overload RStudio
+#do.call(cowplot::plot_grid, c(list(ncol = 1),p))
 ```
 
 
@@ -728,12 +744,20 @@ plotPDF(plotList = p,
 ### Marker genes imputation with MAGIC (point 7.5 in manual)
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 projMulti2 <- addImputeWeights(ArchRProj = projMulti2,
                                reducedDims = "LSI_Combined")
 ```
 
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 p <- plotEmbedding(
     ArchRProj = projMulti2, 
     colorBy = "GeneExpressionMatrix", 
@@ -745,6 +769,10 @@ p <- plotEmbedding(
 
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #Rearrange for grid plotting
 p <- lapply(p, function(x){
     x + guides(color = FALSE, fill = FALSE) + 
@@ -757,11 +785,17 @@ p <- lapply(p, function(x){
         axis.ticks.y=element_blank()
     )
 })
-do.call(cowplot::plot_grid, c(list(ncol = 3),p))
+
+#uncomment to plot, might overload the session
+#do.call(cowplot::plot_grid, c(list(ncol = 3),p))
 ```
 
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #save plot
 plotPDF(plotList = p, 
         name = "Plot-UMAP-Marker-Genes-W-Imputation.pdf", 
@@ -776,6 +810,10 @@ plotPDF(plotList = p,
 
 ```{r}
 #| message: false
+#| warning: false
+#| output: false
+#| include: false #prevent to overload the session but this chunk won't be visible if you render
+
 p <- plotBrowserTrack(
     ArchRProj = projMulti2, 
     groupBy = "Clusters_Combined", 
@@ -787,6 +825,10 @@ p <- plotBrowserTrack(
 
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #save plot
 plotPDF(plotList = p, 
         name = "Plot-Tracks-Marker-Genes.pdf", 
