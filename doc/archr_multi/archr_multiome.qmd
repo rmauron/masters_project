@@ -1101,11 +1101,15 @@ table(projMulti4@cellColData@listData[["predictedGroup_Un_3"]])
 
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #indentify marker peaks by calling addMarkerFeatures()
 markersPeaks <- getMarkerFeatures(
     ArchRProj = projMulti4, 
     useMatrix = "PeakMatrix", 
-    groupBy = "predictedGroup_Un_3", #feature to group by in proj@cellColData@listData[["xxxxxxx"]]
+    groupBy = "predictedGroup_Un_3", #in CellColData
     bias = c("TSSEnrichment", 
              "log10(nFrags)", 
              "log10(Gex_nUMI)"), 
@@ -1113,12 +1117,6 @@ markersPeaks <- getMarkerFeatures(
 )
 ```
 
-
-```{r}
-#object returned by the getMarkerFeatures() function
-#SummarizedExperiment that contains a few different assays
-markersPeaks
-```
 
 
 ```{r}
@@ -1158,6 +1156,10 @@ multiple plotting functions to interact with the SummarizedExperiment objects re
 #### Marker Peak Heatmaps
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 heatmapPeaks <- plotMarkerHeatmap(
   seMarker = markersPeaks, 
   cutOff = "FDR <= 0.1 & Log2FC >= 0.5",
@@ -1180,36 +1182,29 @@ plotPDF(heatmapPeaks, name = "Peak-Marker-Heatmap", width = 8, height = 6, ArchR
 ### MA and Volcano Plots
 
 We can plot MA or Volcano plot for any individual cell group.
-
-#### MA plot
-
-```{r}
-# MA plot
-pma <- plotMarkers(
-    seMarker = markersPeaks, 
-    name = "Oligodendrocytes", #change cell name
-    cutOff = "FDR <= 0.1 & Log2FC >= 1", 
-    plotAs = "MA")
-pma
-```
-
+Here, only VolcanoPlots
 
 #### Volcano plot
 
 ```{r}
 #Volcano plot
+cell_types <- unique(projMulti4@cellColData@listData[["predictedGroup_Un_3"]])
+
+for (cell in cell_types) {
 pv <- plotMarkers(
-    seMarker = markersPeaks, 
-    name = "Oligodendrocytes", #change cell name
-    cutOff = "FDR <= 0.1 & Log2FC >= 1", 
-    plotAs = "Volcano")
-pv
-```
+    seMarker = markersPeaks,
+    name = cell,#"Oligodendrocytes", #change cell name
+    cutOff = "FDR <= 0.1 & Log2FC >= 1",
+    plotAs = "Volcano" #MA
+    ) + ggtitle(cell)
+#print(pv)
+plot_type <- "volcano-markers"
+cell_type <- cell
 
-
-```{r}
-#save plots
-plotPDF(pma, pv, name = "Oligodendrocytes-Markers-MA-Volcano", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+plotPDF(pv, name = gsub(" ", "-",paste(plot_type, cell_type)), width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+}
+rm(plot_type)
+rm(cell_type)
 ```
 
 
