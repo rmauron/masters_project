@@ -1143,9 +1143,7 @@ markerList
 
 
 ```{r}
-#fmarker peaks for a specific cell group 
-#but here retrieve from the GRangesList
-markerList$Oligodendrocytes #change cell type
+#markerList$Oligodendrocytes #change cell type
 ```
 
 
@@ -1187,6 +1185,10 @@ Here, only VolcanoPlots
 #### Volcano plot
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #Volcano plot
 cell_types <- unique(projMulti4@cellColData@listData[["predictedGroup_Un_3"]])
 
@@ -1208,71 +1210,57 @@ rm(cell_type)
 ```
 
 
-#### Marker Peaks in Browser Tracks
-
-can see these peak regions overlayed on our browser tracks by passing the relevant peak regions to the features parameterin the plotBrowserTrack() function. This will add an additional BED-style track of marker peak regions to the bottom of our ArchR track plot. Here we specify plotting the GATA1 gene via the geneSymbol parameter
-
-```{r}
-p <- plotBrowserTrack(
-    ArchRProj = projMulti4, 
-    groupBy = "predictedGroup_Un_3", #change group here
-    geneSymbol = c("Kcnd2"), #specify marker gene here
-    features =  getMarkers(markersPeaks, cutOff = "FDR <= 0.1 & Log2FC >= 1", returnGR = TRUE)["Oligodendrocytes"],
-    upstream = 50000,
-    downstream = 50000
-)
-```
-
-
-We can plot this
-
-```{r}
-grid::grid.newpage()
-grid::grid.draw(p$Kcnd2) #specify marker gene to plot
-```
-
-
-```{r}
-#save plot
-plotPDF(p, name = "Plot-Tracks-With-Features", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
-```
-
-
 ### Pairwise Testing Between Groups
 
 !!! ArchR also enables standard differential testing using the same getMarkerFeatures() function. The trick is to set useGroups to one of the two cell groups and bgdGroups to the other cell group.
 
 ```{r}
-# group 1: useGroups
-# rgoup 2: bgdGroups
-markerTest <- getMarkerFeatures( ### markerTest is also used in other downstream analysis
-  ArchRProj = projMulti4, 
-  useMatrix = "PeakMatrix",
-  groupBy = "predictedGroup_Un_3",
-  testMethod = "wilcoxon",
-  bias = c("TSSEnrichment", "log10(nFrags)"),
-  useGroups = "Oligodendrocytes", #cell type 1
-  bgdGroups = "Oligodendrocyte precursor cells" #cell type 2
-)
+#| message: false
+#| warning: false
+#| output: false
+
+# # group 1: useGroups
+# # group 2: bgdGroups
+# markerTest <- getMarkerFeatures( ### markerTest is also used in other downstream analysis
+#   ArchRProj = projMulti4, 
+#   useMatrix = "PeakMatrix",
+#   groupBy = "predictedGroup_Un_3",
+#   testMethod = "wilcoxon",
+#   bias = c("TSSEnrichment", 
+#              "log10(nFrags)", 
+#              "log10(Gex_nUMI)"),
+#   useGroups = "Oligodendrocytes", #cell type 1
+#   bgdGroups = "Immature neural" #cell type 2
+# )
 ```
 
+markerConditions
 ```{r}
-#plot MA
-pma <- markerPlot(
-    seMarker = markerTest, 
-    name = "Oligodendrocytes", #change cell type
-    cutOff = "FDR <= 0.1 & abs(Log2FC) >= 1", 
-    plotAs = "MA")
-pma
-```
+#| message: false
+#| warning: false
+#| output: false
 
+# # group 1: useGroups
+# # group 2: bgdGroups
+#indentify marker peaks by calling addMarkerFeatures()
+markersPeaksCondition <- getMarkerFeatures(
+    ArchRProj = projMulti4, 
+    useMatrix = "PeakMatrix", 
+    groupBy = "Conditions", #in CellColData
+    bias = c("TSSEnrichment", 
+             "log10(nFrags)", 
+             "log10(Gex_nUMI)"), 
+    testMethod = "wilcoxon"
+)
+
+```
 
 ```{r}
 #plot Volcano
-pv <- markerPlot(
-    seMarker = markerTest, 
-    name = "Oligodendrocytes", #change cell type
-    cutOff = "FDR <= 0.1 & abs(Log2FC) >= 1", 
+pv <- plotMarkers(
+    seMarker = markersPeaksCondition,
+    name = "CF", #change cell type
+    cutOff = "FDR <= 0.1 & abs(Log2FC) >= 0.5",
     plotAs = "Volcano")
 pv
 ```
@@ -1280,7 +1268,7 @@ pv
 
 ```{r}
 #save plots
-plotPDF(pma, pv, name = "Oligodendrocytes-vs-Oligodendrocyte_precursor_cells-Markers-MA-Volcano", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+plotPDF(pv, name = "Conditions-Markers-Volcano", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
 ```
 
 
@@ -1296,6 +1284,7 @@ it creates a binary matrix where the presence of a motif in each peak is indicat
 ### Motif Enrichment in Differential Peaks
 
 ```{r}
+#add information about which peaks contain motifs
 projMulti4 <- addMotifAnnotations(
     ArchRProj = projMulti4, 
     motifSet = "cisbp", 
@@ -1306,9 +1295,16 @@ projMulti4 <- addMotifAnnotations(
 We can then use the differential testing SummarizedExperiment object markerTest which was generated in the previous chapter to define the set of significantly differential peaks that we are interested in testing for motif enrichment.
 
 ```{r}
-#based on the markerTest from previous analysis
+#based on the markerTest from previous analysis or the entire markerPeaks
 motifsUp <- peakAnnoEnrichment(
-    seMarker = markerTest,
+    seMarker = markersPeaks, #markerTest,
+    ArchRProj = projMulti4,
+    peakAnnotation = "Motif",
+    cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
+  )
+
+motifsUpCondition <- peakAnnoEnrichment(
+    seMarker = markersPeaksCondition, #markerTest,
     ArchRProj = projMulti4,
     peakAnnotation = "Motif",
     cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
@@ -1317,8 +1313,8 @@ motifsUp <- peakAnnoEnrichment(
 
 
 ```{r}
-#output of peakAnnoEnrichment() is a SummarizedExperiment object containing multiple assays that store the results of enrichment testing with the hypergeometric test
 motifsUp
+motifsUpCondition
 ```
 
 
@@ -1332,6 +1328,18 @@ df$rank <- seq_len(nrow(df))
 ```{r}
 #to test the most enriched motifs in the peaks 
 head(df)
+```
+
+```{r}
+#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
+df_cond <- data.frame(TF = rownames(motifsUpCondition), mlog10Padj = assay(motifsUpCondition)[,1])
+df_cond <- df_cond[order(df_cond$mlog10Padj, decreasing = TRUE),]
+df_cond$rank <- seq_len(nrow(df_cond))
+```
+
+```{r}
+#to test the most enriched motifs in the peaks 
+head(df_cond)
 ```
 
 
@@ -1355,9 +1363,30 @@ ggUp <- ggplot(df, aes(rank, mlog10Padj, color = mlog10Padj)) +
   ) + theme_ArchR() + 
   ylab("-log10(P-adj) Motif Enrichment") + 
   xlab("Rank Sorted TFs Enriched") +
-  scale_color_gradientn(colors = paletteContinuous(set = "comet"))
+  scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
+    ggtitle("Motif enrichment among every cells")
 
 ggUp
+```
+
+```{r}
+#Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
+
+ggUp_cond <- ggplot(df_cond, aes(rank, mlog10Padj, color = mlog10Padj)) + 
+  geom_point(size = 1) +
+  ggrepel::geom_label_repel(
+        data = df_cond[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
+        size = 1.5,
+        nudge_x = 2,
+        color = "black",
+
+  ) + theme_ArchR() + 
+  ylab("-log10(P-adj) Motif Enrichment") + 
+  xlab("Rank Sorted TFs Enriched") +
+  scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
+    ggtitle("Motif enrichment in conditions")
+
+ggUp_cond
 ```
 
 
