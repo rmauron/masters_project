@@ -29,6 +29,7 @@ loading ArchR, setting up our genome (`hg38`, `mm10`, ...), threads (which are s
 library(ArchR)
 #addArchRGenome("hg38") #for human
 addArchRGenome("mm10") #for mouse
+library(BSgenome.Mmusculus.UCSC.mm10)
 addArchRThreads(32) #rocommended 1/2 of total available cores
 set.seed(1)
 ```
@@ -972,7 +973,8 @@ projMulti3 <- addGeneIntegrationMatrix(
     matrixName = "GeneIntegrationMatrix_db_3",
     reducedDims = "Harmony", #"LSI_Combined"
     seRNA = se_RNA_mousebrain_data,
-    addToArrow = FALSE,
+    addToArrow = TRUE, #set TRUE to the Taonomy you want to add to the ArrowFiles
+    force = TRUE, #to allow rerun
     groupRNA = "TaxonomyRank3",
     nameCell = "predictedCell_Un_3",
     nameGroup = "predictedGroup_Un_3",
@@ -1046,28 +1048,6 @@ saveArchRProject(ArchRProj = projMulti3, outputDirectory = "Save-ProjMulti3", lo
 ```
 
 
-```{r}
-#| message: false
-#| warning: false
-#| output: false
-
-#add cell annotation to ArrowFiles & create new project (can choose between the taxonomy 1-4)
-projMulti4 <- addGeneIntegrationMatrix(
-    ArchRProj = projMulti3, 
-    useMatrix = "GeneExpressionMatrix",
-    matrixName = "GeneIntegrationMatrix_db_3",
-    reducedDims = "LSI_Combined",
-    seRNA = se_RNA_mousebrain_data,
-    addToArrow = TRUE, #rerun previous chunk but now add the cell annotation
-    force = TRUE, #to allow rerun
-    groupRNA = "TaxonomyRank3",
-    nameCell = "predictedCell_Un_3",
-    nameGroup = "predictedGroup_Un_3",
-    nameScore = "predictedScore_Un_3"
-)
-```
-
-
 ## Calling Peaks (point 9 & 10 in manual)
 
 ```{r}
@@ -1075,16 +1055,18 @@ projMulti4 <- addGeneIntegrationMatrix(
 #| warning: false
 #| output: false
 
+projMulti4 <- projMulti3
+
 #add coverage (point 9 in manual)
 projMulti4 <- addGroupCoverages(
     ArchRProj = projMulti4, 
-    groupBy = "Clusters_Combined", #"CellColData" ??
-    verbose = FALSE, force = T)
+    groupBy = "Clusters_Combined" #in CellColData, 
+    )
 
 #get path to the python tool installed through miniconda (MACS2)
 projMulti4 <- addReproduciblePeakSet(
     ArchRProj = projMulti4, 
-    groupBy = "Clusters_Combined", #"CellColData" ??
+    groupBy = "Clusters_Combined", #in CellColData, 
     pathToMacs2 = "/Users/raphaelmauron/Library/Python/3.9/bin/macs2")
 
 #add peaks just found
@@ -1093,7 +1075,7 @@ projMulti4 <- addPeakMatrix(ArchRProj = projMulti4)
 #peak2genes (point 15.3 in manual)
 projMulti4 <- addPeak2GeneLinks(
     ArchRProj = projMulti4, 
-    reducedDims = "LSI_Combined", #"Harmony" ??
+    reducedDims = "Harmony", #"LSI_Combined", 
     useMatrix = "GeneExpressionMatrix")
 
 p2g <- getPeak2GeneLinks(ArchRProj = projMulti4)
@@ -1114,7 +1096,7 @@ getAvailableMatrices(projMulti4)
 
 ```{r}
 #Our scRNA labels to remind ourselves of the cell types that we are working with in projMulti4
-table(projMulti4@cellColData@listData[["predictedGroup_Un_4"]])
+table(projMulti4@cellColData@listData[["predictedGroup_Un_3"]])
 ```
 
 
@@ -1123,7 +1105,7 @@ table(projMulti4@cellColData@listData[["predictedGroup_Un_4"]])
 markersPeaks <- getMarkerFeatures(
     ArchRProj = projMulti4, 
     useMatrix = "PeakMatrix", 
-    groupBy = "predictedGroup_Un_4", #feature to group by in proj@cellColData@listData[["xxxxxxx"]]
+    groupBy = "predictedGroup_Un_3", #feature to group by in proj@cellColData@listData[["xxxxxxx"]]
     bias = c("TSSEnrichment", 
              "log10(nFrags)", 
              "log10(Gex_nUMI)"), 
@@ -1238,7 +1220,7 @@ can see these peak regions overlayed on our browser tracks by passing the releva
 ```{r}
 p <- plotBrowserTrack(
     ArchRProj = projMulti4, 
-    groupBy = "predictedGroup_Un_4", #change group here
+    groupBy = "predictedGroup_Un_3", #change group here
     geneSymbol = c("Kcnd2"), #specify marker gene here
     features =  getMarkers(markersPeaks, cutOff = "FDR <= 0.1 & Log2FC >= 1", returnGR = TRUE)["Oligodendrocytes"],
     upstream = 50000,
@@ -1271,7 +1253,7 @@ plotPDF(p, name = "Plot-Tracks-With-Features", width = 5, height = 5, ArchRProj 
 markerTest <- getMarkerFeatures( ### markerTest is also used in other downstream analysis
   ArchRProj = projMulti4, 
   useMatrix = "PeakMatrix",
-  groupBy = "predictedGroup_Un_4",
+  groupBy = "predictedGroup_Un_3",
   testMethod = "wilcoxon",
   bias = c("TSSEnrichment", "log10(nFrags)"),
   useGroups = "Oligodendrocytes", #cell type 1
@@ -1769,7 +1751,7 @@ markerMotifs
 #these impute weights allow us to smooth the signal across nearby cells which is helpful in the context of our sparse scATAC-seq data
 
 p <- plotGroups(ArchRProj = projMulti4, 
-  groupBy = "predictedGroup_Un_4", 
+  groupBy = "predictedGroup_Un_3", 
   colorBy = "MotifMatrix", 
   name = markerMotifs,
   imputeWeights = getImputeWeights(projMulti4)
@@ -1971,7 +1953,7 @@ markerMotifs
 
 ```{r}
 projMulti4 <- addGroupCoverages(ArchRProj = projMulti4,
-                                groupBy = "predictedGroup_Un_4")
+                                groupBy = "predictedGroup_Un_3")
 ```
 
 
@@ -1982,7 +1964,7 @@ projMulti4 <- addGroupCoverages(ArchRProj = projMulti4,
 seFoot <- getFootprints(
   ArchRProj = projMulti4, 
   positions = motifPositions[markerMotifs], #specify the subset of motifs
-  groupBy = "predictedGroup_Un_4"
+  groupBy = "predictedGroup_Un_3"
 )
 ```
 
@@ -2051,7 +2033,7 @@ Here, TSS (Transcription Start Site) insertion profile (= specialized subcase of
 seTSS <- getFootprints(
   ArchRProj = projMulti4, 
   positions = GRangesList(TSS = getTSS(projMulti4)), #specify 
-  groupBy = "predictedGroup_Un_4",
+  groupBy = "predictedGroup_Un_3",
   flank = 2000 #extend the footprints on both side of each TSS
 )
 ```
@@ -2156,7 +2138,7 @@ markerGenes <- my_markers
 
 p <- plotBrowserTrack(
     ArchRProj = projMulti4, 
-    groupBy = "predictedGroup_Un_4", 
+    groupBy = "predictedGroup_Un_3", 
     geneSymbol = markerGenes, 
     upstream = 50000,
     downstream = 50000,
@@ -2252,7 +2234,7 @@ NB: the code commented below are actually performed in the mentioned chapter ear
 
 p <- plotBrowserTrack(
     ArchRProj = projMulti4, 
-    groupBy = "predictedGroup_Un_4", 
+    groupBy = "predictedGroup_Un_3", 
     geneSymbol = markerGenes, 
     upstream = 50000,
     downstream = 50000,
@@ -2286,7 +2268,7 @@ To visualize the correspondence of all of our **peak-to-gene links**, we can plo
 
 ```{r}
 p <- plotPeak2GeneHeatmap(ArchRProj = projMulti4, 
-                          groupBy = "predictedGroup_Un_4")
+                          groupBy = "predictedGroup_Un_3")
 ```
 
 
@@ -2322,7 +2304,7 @@ Did that when creating "MotifMatrix"
 #retrieve this data (deviant TF motifs)
 seGroupMotif <- getGroupSE(ArchRProj = projMulti4, 
                            useMatrix = "MotifMatrix", 
-                           groupBy = "predictedGroup_Un_4")
+                           groupBy = "predictedGroup_Un_3")
 ```
 
 
@@ -2469,7 +2451,7 @@ ArchR creates cellular trajectories that order cells across a lower N-dimensiona
 #review clusters and cell types that we defined and stored in cellColData in columns "Clusters" and "Clusters2"
 p1 <- plotEmbedding(ArchRProj = projMulti4, 
                     colorBy = "cellColData", 
-                    name = "predictedGroup_Un_4", 
+                    name = "predictedGroup_Un_3", 
                     embedding = "UMAPHarmony")
 ```
 
@@ -2477,7 +2459,7 @@ p1 <- plotEmbedding(ArchRProj = projMulti4,
 #in clusters2
 p2 <- plotEmbedding(ArchRProj = projMulti4, 
                     colorBy = "cellColData", 
-                    name = "predictedGroup_Un_4", 
+                    name = "predictedGroup_Un_3", 
                     embedding = "UMAPHarmony")
 ```
 
@@ -2489,11 +2471,11 @@ ggAlignPlots(p1, p2, type = "h")
 ### Pseudo-time UMAPs and individual feature plots
 
 create a vector of the form: c("cell_state_1", "cell_state_2", "cell_state_3")
-from the definitions stored in "predictedGroup_Un_4"
+from the definitions stored in "predictedGroup_Un_3"
 
 ```{r}
-#print again every unique cell types in "predictedGroup_Un_4"
-unique(projMulti3@cellColData@listData[["predictedGroup_Un_4"]])
+#print again every unique cell types in "predictedGroup_Un_3"
+unique(projMulti3@cellColData@listData[["predictedGroup_Un_3"]])
 ```
 
 
@@ -2510,7 +2492,7 @@ trajectory
 projMulti4 <- addTrajectory(
     ArchRProj = projMulti4, 
     name = "Oligodendrocytes", #change name here if desired
-    groupBy = "predictedGroup_Un_4",
+    groupBy = "predictedGroup_Un_3",
     trajectory = trajectory, 
     embedding = "UMAPHarmony", 
     force = TRUE
