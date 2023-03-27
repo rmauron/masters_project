@@ -1167,7 +1167,7 @@ heatmapPeaks <- plotMarkerHeatmap(
 
 
 ```{r}
-draw(heatmapPeaks, heatmap_legend_side = "bot", annotation_legend_side = "bot")
+#draw(heatmapPeaks, heatmap_legend_side = "bot", annotation_legend_side = "bot")
 ```
 
 
@@ -1284,7 +1284,7 @@ plotPDF(pv, name = "Conditions-PeakMarkers-Volcano", width = 5, height = 5, Arch
 # # group 2: bgdGroups
 getAvailableMatrices(projMulti4)
 #indentify marker peaks by calling addMarkerFeatures()
-markersPeaksCondition <- getMarkerFeatures(
+markersGenesCondition <- getMarkerFeatures(
     ArchRProj = projMulti4, 
     useMatrix = "GeneExpressionMatrix", #"PeakMatrix", 
     groupBy = "Conditions", #in CellColData
@@ -1300,7 +1300,7 @@ markersPeaksCondition <- getMarkerFeatures(
 ```{r}
 #plot Volcano
 pv <- plotMarkers(
-    seMarker = markersPeaksCondition,
+    seMarker = markersGenesCondition,
     name = "CF", #change cell type
     cutOff = "FDR <= 0.1 & abs(Log2FC) >= 0.5",#"FDR <= 0.1 & abs(Log2FC) >= 0.5",
     plotAs = "Volcano")
@@ -1312,6 +1312,8 @@ pv <- plotMarkers(
 #save plots
 plotPDF(pv, name = "Conditions-GeneExpression-Volcano", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
 ```
+
+
 ## Motif and Feature Enrichment (point 12 in manual)
 
 Want to predict what transcription factors may be mediating the binding events that create those accessible chromatin sites.
@@ -1324,6 +1326,9 @@ it creates a binary matrix where the presence of a motif in each peak is indicat
 ### Motif Enrichment in Differential Peaks
 
 ```{r}
+#| message: false
+#| warning: false
+
 #add information about which peaks contain motifs
 projMulti4 <- addMotifAnnotations(
     ArchRProj = projMulti4, 
@@ -1336,6 +1341,9 @@ projMulti4 <- addMotifAnnotations(
 We can then use the differential testing SummarizedExperiment object markerTest which was generated in the previous chapter to define the set of significantly differential peaks that we are interested in testing for motif enrichment.
 
 ```{r}
+#| message: false
+#| warning: false
+
 #based on the markerTest from previous analysis or the entire markerPeaks
 motifsUp <- peakAnnoEnrichment(
     seMarker = markersPeaks, #markerTest,
@@ -1429,6 +1437,9 @@ ggUp_cond <- ggplot(df_cond, aes(rank, mlog10Padj, color = mlog10Padj)) +
 
 
 ```{r}
+#| message: false
+#| warning: false
+
 # for the peaks that are more accessible in the "CG" cells by using peaks with Log2FC <= -0.5
 motifsDo <- peakAnnoEnrichment(
     seMarker = markersPeaksCondition,
@@ -1481,6 +1492,9 @@ plotPDF(ggUp, ggUp_cond, ggDo, name = "Motifs-Enriched-plot", width = 5, height 
 Can also perform motif enrichment on our marker peaks identified in using getMarkerFeatures()
 
 ```{r}
+#| message: false
+#| warning: false
+
 enrichMotifs <- peakAnnoEnrichment(
     seMarker = markersPeaks,
     ArchRProj = projMulti4,
@@ -1548,6 +1562,9 @@ projMulti4 <- addBgdPeaks(projMulti4)
 
 
 ```{r}
+#| message: false
+#| warning: false
+
 #compute per-cell deviations across all of our motif annotations
 #create a deviations matrix in each of our Arrow files called "MotifMatrix"
 projMulti4 <- addDeviationsMatrix(
@@ -1596,6 +1613,9 @@ markerMotifs
 
 
 ```{r}
+#| message: false
+#| warning: false
+
 #plot the distribution of chromVAR deviation scores for each cluster
 #Notice that we supply the impute weights that we calculated previously during our gene score analyses
 #these impute weights allow us to smooth the signal across nearby cells which is helpful in the context of our sparse scATAC-seq data
@@ -1608,7 +1628,7 @@ p <- plotGroups(ArchRProj = projMulti4,
 )
 ```
 
-!!! Need more than 1 motif
+
 ```{r}
 #cowplot to plot the distributions of all motifs in a single plot
 p2 <- lapply(seq_along(p), function(x){
@@ -1631,7 +1651,7 @@ p2 <- lapply(seq_along(p), function(x){
     ) + ylab("")
   }
 })
-do.call(cowplot::plot_grid, c(list(nrow = 1, rel_widths = c(2, rep(1, length(p2) - 1))),p2))
+#do.call(cowplot::plot_grid, c(list(nrow = 1, rel_widths = c(2, rep(1, length(p2) - 1))),p2))
 ```
 
 
@@ -1719,7 +1739,7 @@ p2 <- lapply(p, function(x){
         axis.ticks.y=element_blank()
     )
 })
-do.call(cowplot::plot_grid, c(list(ncol = 3),p2))
+#do.call(cowplot::plot_grid, c(list(ncol = 3),p2))
 ```
 
 
@@ -1784,6 +1804,7 @@ plotPDF(plotList = p,
     addDOC = FALSE, width = 5, height = 5)
 ```
 
+
 ### Also custom Deviations (point 13.2 in manual)
 Check ArchR_multi_complete for the code for it
 
@@ -1809,7 +1830,7 @@ motifPositions
 ```{r}
 #list of marker to use for the subset
 # motifs <- c() #specify another motifs list here if want others than my_markers
-motifs <- my_markers
+motifs <- c(my_markers, "Zfp148", "Tcf15", "Scx")
 
 markerMotifs <- unlist(lapply(motifs, function(x) grep(x, names(motifPositions), value = TRUE)))
 markerMotifs <- markerMotifs[markerMotifs %ni% "SREBF1_22"]
@@ -1818,6 +1839,9 @@ markerMotifs
 
 
 ```{r}
+#| message: false
+#| warning: false
+
 projMulti4 <- addGroupCoverages(ArchRProj = projMulti4,
                                 groupBy = "predictedGroup_Un_3")
 ```
