@@ -526,7 +526,7 @@ p5
 
 ```{r}
 #save plot
-plotPDF(p1, p2, name = "Harmony-Combined-sample-clusters", addDOC = FALSE)
+plotPDF(p1, p2, p3, p4, p5, name = "Harmony-Combined-sample-clusters", addDOC = FALSE)
 ```
 
 
@@ -1234,7 +1234,8 @@ rm(cell_type)
 # )
 ```
 
-markerConditions
+### markerConditions
+
 ```{r}
 #| message: false
 #| warning: false
@@ -1242,17 +1243,19 @@ markerConditions
 
 # # group 1: useGroups
 # # group 2: bgdGroups
+getAvailableMatrices(projMulti4)
 #indentify marker peaks by calling addMarkerFeatures()
 markersPeaksCondition <- getMarkerFeatures(
     ArchRProj = projMulti4, 
-    useMatrix = "PeakMatrix", 
+    useMatrix = "PeakMatrix", #"PeakMatrix", 
     groupBy = "Conditions", #in CellColData
     bias = c("TSSEnrichment", 
              "log10(nFrags)", 
              "log10(Gex_nUMI)"), 
-    testMethod = "wilcoxon"
+    testMethod = "wilcoxon",
+    useGroups = "CF", #cell type 1
+    bgdGroups = "CG" #cell type 2
 )
-
 ```
 
 ```{r}
@@ -1260,18 +1263,55 @@ markersPeaksCondition <- getMarkerFeatures(
 pv <- plotMarkers(
     seMarker = markersPeaksCondition,
     name = "CF", #change cell type
-    cutOff = "FDR <= 0.1 & abs(Log2FC) >= 0.5",
+    cutOff = "FDR <= 0.1 & abs(Log2FC) >= 0.5",#"FDR <= 0.1 & abs(Log2FC) >= 0.5",
     plotAs = "Volcano")
-pv
+#pv
 ```
 
 
 ```{r}
 #save plots
-plotPDF(pv, name = "Conditions-Markers-Volcano", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+plotPDF(pv, name = "Conditions-PeakMarkers-Volcano", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
 ```
 
 
+```{r}
+#| message: false
+#| warning: false
+#| output: false
+
+# # group 1: useGroups
+# # group 2: bgdGroups
+getAvailableMatrices(projMulti4)
+#indentify marker peaks by calling addMarkerFeatures()
+markersPeaksCondition <- getMarkerFeatures(
+    ArchRProj = projMulti4, 
+    useMatrix = "GeneExpressionMatrix", #"PeakMatrix", 
+    groupBy = "Conditions", #in CellColData
+    bias = c("TSSEnrichment", 
+             "log10(nFrags)", 
+             "log10(Gex_nUMI)"), 
+    testMethod = "wilcoxon",
+    useGroups = "CF", #cell type 1
+    bgdGroups = "CG" #cell type 2
+)
+```
+
+```{r}
+#plot Volcano
+pv <- plotMarkers(
+    seMarker = markersPeaksCondition,
+    name = "CF", #change cell type
+    cutOff = "FDR <= 0.1 & abs(Log2FC) >= 0.5",#"FDR <= 0.1 & abs(Log2FC) >= 0.5",
+    plotAs = "Volcano")
+#pv
+```
+
+
+```{r}
+#save plots
+plotPDF(pv, name = "Conditions-GeneExpression-Volcano", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+```
 ## Motif and Feature Enrichment (point 12 in manual)
 
 Want to predict what transcription factors may be mediating the binding events that create those accessible chromatin sites.
@@ -1288,7 +1328,8 @@ it creates a binary matrix where the presence of a motif in each peak is indicat
 projMulti4 <- addMotifAnnotations(
     ArchRProj = projMulti4, 
     motifSet = "cisbp", 
-    name = "Motif")
+    name = "Motif",
+    force = T)
 ```
 
 
@@ -1300,21 +1341,16 @@ motifsUp <- peakAnnoEnrichment(
     seMarker = markersPeaks, #markerTest,
     ArchRProj = projMulti4,
     peakAnnotation = "Motif",
-    cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
+    cutOff = "FDR <= 0.1 & Log2FC >= 1"
   )
 
+#motifs enrichment from differential testing among conditions
 motifsUpCondition <- peakAnnoEnrichment(
     seMarker = markersPeaksCondition, #markerTest,
     ArchRProj = projMulti4,
     peakAnnotation = "Motif",
-    cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
+    cutOff = "FDR <= 0.1 & Log2FC >= 1"
   )
-```
-
-
-```{r}
-motifsUp
-motifsUpCondition
 ```
 
 
@@ -1324,6 +1360,7 @@ df <- data.frame(TF = rownames(motifsUp), mlog10Padj = assay(motifsUp)[,1])
 df <- df[order(df$mlog10Padj, decreasing = TRUE),]
 df$rank <- seq_len(nrow(df))
 ```
+
 
 ```{r}
 #to test the most enriched motifs in the peaks 
@@ -1366,8 +1403,9 @@ ggUp <- ggplot(df, aes(rank, mlog10Padj, color = mlog10Padj)) +
   scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
     ggtitle("Motif enrichment among every cells")
 
-ggUp
+#ggUp
 ```
+
 
 ```{r}
 #Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
@@ -1384,25 +1422,20 @@ ggUp_cond <- ggplot(df_cond, aes(rank, mlog10Padj, color = mlog10Padj)) +
   ylab("-log10(P-adj) Motif Enrichment") + 
   xlab("Rank Sorted TFs Enriched") +
   scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
-    ggtitle("Motif enrichment in conditions")
+    ggtitle("Motif enrichment in CF")
 
-ggUp_cond
+#ggUp_cond
 ```
 
 
 ```{r}
-# for the peaks that are more accessible in the "Progenitor" cells by using peaks with Log2FC <= -0.5
+# for the peaks that are more accessible in the "CG" cells by using peaks with Log2FC <= -0.5
 motifsDo <- peakAnnoEnrichment(
-    seMarker = markerTest,
+    seMarker = markersPeaksCondition,
     ArchRProj = projMulti4,
     peakAnnotation = "Motif",
-    cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
+    cutOff = "FDR <= 0.1 & Log2FC <= -1"
   )
-```
-
-
-```{r}
-motifsDo
 ```
 
 
@@ -1429,15 +1462,16 @@ ggDo <- ggplot(df, aes(rank, mlog10Padj, color = mlog10Padj)) +
   ) + theme_ArchR() + 
   ylab("-log10(FDR) Motif Enrichment") +
   xlab("Rank Sorted TFs Enriched") +
-  scale_color_gradientn(colors = paletteContinuous(set = "comet"))
+  scale_color_gradientn(colors = paletteContinuous(set = "comet"))+
+    ggtitle("Motif enrichment in CG")
 
-ggDo
+#ggDo
 ```
 
 
 ```{r}
 #save plots
-plotPDF(ggUp, ggDo, name = "Oligodendrocytes-vs-Oligodendrocytes-Markers-Motifs-Enriched", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+plotPDF(ggUp, ggUp_cond, ggDo, name = "Motifs-Enriched-plot", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
 ```
 
 
@@ -1457,11 +1491,6 @@ enrichMotifs <- peakAnnoEnrichment(
 
 
 ```{r}
-enrichMotifs
-```
-
-
-```{r}
 #plot motif enrichments across all cell groups
 heatmapEM <- plotEnrichHeatmap(enrichMotifs, 
                                n = 7, #number of motifs shown per cell group
@@ -1471,7 +1500,7 @@ heatmapEM <- plotEnrichHeatmap(enrichMotifs,
 
 ```{r}
 #plot
-ComplexHeatmap::draw(heatmapEM, heatmap_legend_side = "bot", annotation_legend_side = "bot")
+#ComplexHeatmap::draw(heatmapEM, heatmap_legend_side = "bot", annotation_legend_side = "bot")
 ```
 
 
@@ -1481,207 +1510,13 @@ plotPDF(heatmapEM, name = "Motifs-Enriched-Marker-Heatmap", width = 8, height = 
 ```
 
 
-
 ### ArchR Enrichment
 Can use other collections in order to identify enrichment motifs
 
 - Encode
 - Bulk ATAC-seq
 - Codex
-
-#### Encode TF Binding Sites
-
-```{r}
-# #add the annotations
-# projMulti4 <- addArchRAnnotations(
-#     ArchRProj = projMulti4, 
-#     collection = "EncodeTFBS")
-```
-
-
-```{r}
-# # test for enrichment of those annotations
-# enrichEncode <- peakAnnoEnrichment(
-#     seMarker = markersPeaks,
-#     ArchRProj = projMulti4,
-#     peakAnnotation = "EncodeTFBS",
-#     cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
-#   )
-```
-
-
-```{r}
-# #returns a SummarizedExperiment object
-# enrichEncode
-```
-
-
-```{r}
-# #create heatmap
-# heatmapEncode <- plotEnrichHeatmap(enrichEncode, n = 7, transpose = TRUE)
-```
-
-
-```{r}
-# #plot heatmap
-# ComplexHeatmap::draw(heatmapEncode, heatmap_legend_side = "bot", annotation_legend_side = "bot")
-```
-
-
-```{r}
-# #save plot
-# plotPDF(heatmapEncode, name = "EncodeTFBS-Enriched-Marker-Heatmap", width = 8, height = 6, ArchRProj = projMulti4, addDOC = FALSE)
-```
-
-
-#### Bulk ATAC-seq
-Peak calls from bulk ATAC-seq experiments that can be used for overlap enrichment testing.
-
-```{r}
-# #add annotation
-# projMulti4 <- addArchRAnnotations(
-#     ArchRProj = projMulti4, 
-#     collection = "ATAC")
-```
-
-
-```{r}
-# #test for enrichment
-# enrichATAC <- peakAnnoEnrichment(
-#     seMarker = markersPeaks,
-#     ArchRProj = projMulti4,
-#     peakAnnotation = "ATAC",
-#     cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
-#   )
-```
-
-
-```{r}
-# #check object
-# enrichATAC
-```
-
-
-```{r}
-# #create heatmap
-# heatmapATAC <- plotEnrichHeatmap(enrichATAC, n = 7, transpose = TRUE)
-```
-
-
-```{r}
-# #plot
-# ComplexHeatmap::draw(heatmapATAC, heatmap_legend_side = "bot", annotation_legend_side = "bot")
-```
-
-
-```{r}
-# #save plot
-# plotPDF(heatmapATAC, name = "ATAC-Enriched-Marker-Heatmap", width = 8, height = 6, ArchRProj = projMulti4, addDOC = FALSE)
-```
-
-
-#### Codex TFBS
-Same analysis performed for codex.
-
-```{r}
-# #add annotations
-# projMulti4 <- addArchRAnnotations(ArchRProj = projMulti4, collection = "Codex")
-```
-
-
-```{r}
-# #enrichment
-# enrichCodex <- peakAnnoEnrichment(
-#     seMarker = markersPeaks,
-#     ArchRProj = projMulti4,
-#     peakAnnotation = "Codex",
-#     cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
-#   )
-```
-
-
-```{r}
-# #return object
-# enrichCodex
-```
-
-
-```{r}
-# #create heatmap
-# heatmapCodex <- plotEnrichHeatmap(enrichCodex, n = 7, transpose = TRUE)
-```
-
-
-```{r}
-# #plot
-# ComplexHeatmap::draw(heatmapCodex, heatmap_legend_side = "bot", annotation_legend_side = "bot")
-```
-
-
-```{r}
-# #save plot
-# plotPDF(heatmapCodex, name = "Codex-Enriched-Marker-Heatmap", width = 8, height = 6, ArchRProj = projMulti4, addDOC = FALSE)
-```
-
-
-### Custom Enrichment
-
-Can accept user-defined annotations to perform custom enrichments.
-
-We illustrate how to create a custom annotation based on select ENCODE ChIP-seq experiments
-
-!!! might not work with the data your passing so code is commented.
-
-```{r}
-# #define dataset that we will use + loading
-# EncodePeaks <- c(
-#   Encode_K562_GATA1 = "https://www.encodeproject.org/files/ENCFF632NQI/@@download/ENCFF632NQI.bed.gz",
-#   Encode_GM12878_CEBPB = "https://www.encodeproject.org/files/ENCFF761MGJ/@@download/ENCFF761MGJ.bed.gz",
-#   Encode_K562_Ebf1 = "https://www.encodeproject.org/files/ENCFF868VSY/@@download/ENCFF868VSY.bed.gz",
-#   Encode_K562_Pax5 = "https://www.encodeproject.org/files/ENCFF339KUO/@@download/ENCFF339KUO.bed.gz"
-# )
-```
-
-
-```{r}
-# #add custom annotation
-# projMulti4 <- addPeakAnnotations(ArchRProj = projMulti4, regions = EncodePeaks, name = "ChIP")
-```
-
-
-```{r}
-# #test enrichment
-# enrichRegions <- peakAnnoEnrichment(
-#     seMarker = markersPeaks,
-#     ArchRProj = projMulti4,
-#     peakAnnotation = "ChIP",
-#     cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
-#   )
-```
-
-
-```{r}
-# #return object
-# enrichRegions
-```
-
-
-```{r}
-# #create heatmap
-# heatmapRegions <- plotEnrichHeatmap(enrichRegions, n = 7, transpose = TRUE)
-```
-
-
-```{r}
-# #plot
-# ComplexHeatmap::draw(heatmapRegions, heatmap_legend_side = "bot", annotation_legend_side = "bot")
-```
-
-
-```{r}
-# #save plot
-# plotPDF(heatmapRegions, name = "Regions-Enriched-Marker-Heatmap", width = 8, height = 6, ArchRProj = projMulti4, addDOC = FALSE)
-```
+(check ArchR_multi_complete script for the corresponding code)
 
 
 ## ChromVAR Deviations Enrichment (point 13 in manual)
@@ -1713,7 +1548,7 @@ projMulti4 <- addBgdPeaks(projMulti4)
 
 
 ```{r}
-#compute per-cell deviations accross all of our motif annotations
+#compute per-cell deviations across all of our motif annotations
 #create a deviations matrix in each of our Arrow files called "MotifMatrix"
 projMulti4 <- addDeviationsMatrix(
   ArchRProj = projMulti4, 
@@ -1731,7 +1566,7 @@ plotVarDev <- getVarDeviations(projMulti4, name = "MotifMatrix", plot = TRUE)
 
 ```{r}
 #plot
-plotVarDev
+#plotVarDev
 ```
 
 
@@ -1745,16 +1580,7 @@ plotPDF(plotVarDev, name = "Variable-Motif-Deviation-Scores", width = 5, height 
 
 ```{r}
 #to analyze subset of features
-# motifs <- c("Smarcc1", #from list above
-#                  "Fos",
-#                  "Bach1",
-#                  "Msc", #C1
-#                  "Neurod2", #C2
-#                  "Neurod4", #C3
-#                  "Neurog1", #C4
-#                  "Sfpi1", #C6
-#                  "Neurod1" #C7
-#                  ) #specify motifs here
+# motifs <- c() #instead of using "my_markers" you can specify another list here
 motifs <- my_markers
 markerMotifs <- getFeatures(projMulti4, select = paste(motifs, collapse="|"), useMatrix = "MotifMatrix")
 markerMotifs
@@ -1775,7 +1601,7 @@ markerMotifs
 #these impute weights allow us to smooth the signal across nearby cells which is helpful in the context of our sparse scATAC-seq data
 
 p <- plotGroups(ArchRProj = projMulti4, 
-  groupBy = "predictedGroup_Un_3", 
+  groupBy = "predictedGroup_Un_3", #"Conditions", 
   colorBy = "MotifMatrix", 
   name = markerMotifs,
   imputeWeights = getImputeWeights(projMulti4)
@@ -1830,6 +1656,8 @@ p <- plotEmbedding(
 
 
 ```{r}
+#| warning: false
+
 #can plot all of these motif UMAPs using cowplot
 p2 <- lapply(p, function(x){
     x + guides(color = FALSE, fill = FALSE) + 
@@ -1842,7 +1670,13 @@ p2 <- lapply(p, function(x){
         axis.ticks.y=element_blank()
     )
 })
-do.call(cowplot::plot_grid, c(list(ncol = 3),p2))
+#do.call(cowplot::plot_grid, c(list(ncol = 3),p2))
+```
+
+
+```{r}
+#save plot
+plotPDF(p, name = "Plot-Groups-Deviations-w-Z-score-embedding", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
 ```
 
 
@@ -1855,8 +1689,9 @@ To see how these TF deviation z-scores compare to the inferred gene expression v
 markerRNA <- getFeatures(projMulti4, 
                          select = paste(motifs, collapse="|"), 
                          useMatrix = "GeneExpressionMatrix")
-#markerRNA <- markerRNA[markerRNA %ni% c("SREBF1","CEBPA-DT")] #exclude some motifs
-markerRNA
+markerRNA <- markerRNA[markerRNA %ni% c("Chic1","Egfros", "Gba2", "Kptn", "Nptn", "Optn", "Ppargc1a", "Ppargc1b","Prox1os", "Qsox2", "Rptn", "Sox2ot", "Spink1", "Spink10", "Spink11", "Spink12", "Spink13", "Spink14", "Sox6os", "Sox21", "Uchl1os", "Vps35l")] #exclude some motifs that are not in "my_markers"
+sort(markerRNA)
+#sort(my_markers) #to compare if needed
 ```
 
 
@@ -1888,6 +1723,12 @@ do.call(cowplot::plot_grid, c(list(ncol = 3),p2))
 ```
 
 
+```{r}
+#save plot
+plotPDF(p, name = "Plot-Groups-Deviations-w-GeneExpression-embedding", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+```
+
+
 #### Overlay Linked gene expression (ATAC + RNA)
 
 Similarly, because we previously linked our scATAC-seq data with corresponding scRNA-seq data, we can plot the linked gene expression for each of these TFs on the UMAP embedding.
@@ -1900,9 +1741,9 @@ getAvailableMatrices(projMulti4)
 ```{r}
 markerRNA <- getFeatures(projMulti4,
                          select = paste(motifs, collapse="|"),
-                         useMatrix = "GeneIntegrationMatrix_db_4") ###??? which matrix
+                         useMatrix = "GeneIntegrationMatrix_db_3")
 
-#markerRNA <- markerRNA[markerRNA %ni% c("SREBF1","CEBPA-DT")]
+markerRNA <- markerRNA <- markerRNA[markerRNA %ni% c("Chic1","Egfros", "Gba2", "Kptn", "Nptn", "Optn", "Ppargc1a", "Ppargc1b","Prox1os", "Qsox2", "Rptn", "Sox2ot", "Spink1", "Spink10", "Spink11", "Spink12", "Spink13", "Spink14", "Sox6os", "Sox21", "Uchl1os", "Vps35l")] #exclude some motifs that are not in "my_markers"
 markerRNA
 ```
 
@@ -1910,7 +1751,7 @@ markerRNA
 ```{r}
 p <- plotEmbedding(
     ArchRProj = projMulti4,
-    colorBy = "GeneIntegrationMatrix_db_4", # ???
+    colorBy = "GeneIntegrationMatrix_db_3",
     name = sort(markerRNA),
     embedding = "UMAPHarmony",
     continuousSet = "blueYellow",
@@ -1920,6 +1761,7 @@ p <- plotEmbedding(
 
 
 ```{r}
+#| warning: false
 p2 <- lapply(p, function(x){
     x + guides(color = FALSE, fill = FALSE) +
     theme_ArchR(baseSize = 6.5) +
@@ -1931,11 +1773,20 @@ p2 <- lapply(p, function(x){
         axis.ticks.y=element_blank()
     )
 })
-do.call(cowplot::plot_grid, c(list(ncol = 3),p2))
+#do.call(cowplot::plot_grid, c(list(ncol = 3),p2))
+```
+
+```{r}
+#to save
+plotPDF(plotList = p, 
+    name = "linked-gene-expression-of-TF.pdf", 
+    ArchRProj = projMulti4, 
+    addDOC = FALSE, width = 5, height = 5)
 ```
 
 ### Also custom Deviations (point 13.2 in manual)
-Not reproduced here.
+Check ArchR_multi_complete for the code for it
+
 
 ## Footprinting (point 14 in manual)
 
@@ -1957,16 +1808,7 @@ motifPositions
 
 ```{r}
 #list of marker to use for the subset
-# motifs <- c("Smarcc1", #from list above
-#                  "Fos",
-#                  "Bach1",
-#                  "Msc", #C1
-#                  "Neurod2", #C2
-#                  "Neurod4", #C3
-#                  "Neurog1", #C4
-#                  "Sfpi1", #C6
-#                  "Neurod1" #C7
-#                  ) #specify motifs here
+# motifs <- c() #specify another motifs list here if want others than my_markers
 motifs <- my_markers
 
 markerMotifs <- unlist(lapply(motifs, function(x) grep(x, names(motifPositions), value = TRUE)))
@@ -2078,7 +1920,7 @@ plotFootprints(
 
 
 ## Integrative Analysis (point 15 in manual)
-### Deeper insights !!!
+Deeper insights !!!
 
 Strength of ArchR is the ability to integrate multiple levels of information to provide novel insights (either ATAC-seq only or analysis integrating scRNA-seq data).
 
@@ -2099,7 +1941,7 @@ Co-accessibility is a correlation in accessibility between 2 peaks across many s
 #add co-accessibility peaks to the object
 projMulti4 <- addCoAccessibility(
     ArchRProj = projMulti4,
-    reducedDims = "LSI_Combined" #can change dimensionality reduction here
+    reducedDims = "Harmony" #can change dimensionality reduction here
 )
 ```
 
@@ -2364,7 +2206,7 @@ corGSM_MM <- correlateMatrices(
     ArchRProj = projMulti4,
     useMatrix1 = "GeneExpressionMatrix",
     useMatrix2 = "MotifMatrix",
-    reducedDims = "LSI_Combined"
+    reducedDims = "Harmony"
 )
 ```
 
@@ -2381,9 +2223,9 @@ Same analysis with the GeneIntegrationMatrix:
 #can perform the same analysis using the GeneIntegrationMatrix instead of the GeneScoreMatrix
 corGIM_MM <- correlateMatrices(
     ArchRProj = projMulti4,
-    useMatrix1 = "GeneIntegrationMatrix_db_4", #do we have that in our case?
+    useMatrix1 = "GeneIntegrationMatrix_db_3", #do we have that in our case?
     useMatrix2 = "MotifMatrix",
-    reducedDims = "LSI_Combined"
+    reducedDims = "Harmony"
 )
 ```
 
@@ -2575,7 +2417,7 @@ p1 <- plotTrajectory(projMulti4,
 #We can repeat this process but color the cells by their linked gene expression via the GeneIntegrationMatrix
 p2 <- plotTrajectory(projMulti4, 
                      trajectory = "Oligodendrocytes", 
-                     colorBy = "GeneIntegrationMatrix_db_4", #can change matrix
+                     colorBy = "GeneIntegrationMatrix_db_3", #can change matrix
                      name = "Kcnd2", 
                      continuousSet = "blueYellow",
                      embedding = "UMAPHarmony")
@@ -2643,7 +2485,7 @@ p2 <- trajectoryHeatmap(trajGSM,  pal = paletteContinuous(set = "horizonExtra"))
 #PSeudo-time for Gene Integration
 trajGIM <- getTrajectory(ArchRProj = projMulti4, 
                          name = "Oligodendrocytes", 
-                         useMatrix = "GeneIntegrationMatrix_db_4", 
+                         useMatrix = "GeneIntegrationMatrix_db_3", 
                          log2Norm = FALSE)
 ```
 
