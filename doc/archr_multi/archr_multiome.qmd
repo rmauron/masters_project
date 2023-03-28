@@ -1985,6 +1985,7 @@ cA <- getCoAccessibility(
 cA
 ```
 
+
 This co-accessibility DataFrame also has a metadata component containing a GRanges object of the relevant peaks. The indexes of queryHits and subjectHits mentioned above apply to this GRanges object.
 
 ```{r}
@@ -1997,7 +1998,7 @@ metadata(cA)[[1]]
 cA <- getCoAccessibility(
     ArchRProj = projMulti4,
     corCutOff = 0.5,
-    resolution = 1000, #when decrease the resolution (= 1000 instead of = 1), can help with overplotting of co-accessibility interactions
+    resolution = 1, #when decrease the resolution (= 1000 instead of = 1), can help with overplotting of co-accessibility interactions
     returnLoops = TRUE # return co-accessibility in the form of a loop track
 )
 ```
@@ -2029,7 +2030,7 @@ markerGenes <- my_markers
 p <- plotBrowserTrack(
     ArchRProj = projMulti4, 
     groupBy = "predictedGroup_Un_3", 
-    geneSymbol = markerGenes, 
+    geneSymbol = "Dkk3", #my_markers, #markerGenes, 
     upstream = 50000,
     downstream = 50000,
     loops = getCoAccessibility(projMulti4)
@@ -2040,7 +2041,7 @@ p <- plotBrowserTrack(
 ```{r}
 #to open in browser
 grid::grid.newpage()
-grid::grid.draw(p$Kcnd2)
+grid::grid.draw(p$Dkk3)
 ```
 
 
@@ -2055,72 +2056,18 @@ plotPDF(plotList = p,
 
 ### Peak2GeneLinkage (point 15.3 in manual)
 
-Identify "peak to gene links" (done in chapter ("Calling Peaks (point 9 & 10 in manual)") above). Here we will call 
+Identify "peak to gene links" (done in chapter ("Calling Peaks (point 9 & 10 in manual)") above). Here we will call: 
 
-**!!! co-accessibility = ATAC-seq-only analysis**
-
-**!!! Peak2GeneLinkage = leverages scRNA-seq data to look for correlations between peak accessibility and gene expression**
+**co-accessibility = ATAC-seq-only analysis**
+**Peak2GeneLinkage = leverages scRNA-seq data to look for correlations between peak accessibility and gene expression**
 
 --> correlates scATAC-seq and scRNA-seq: often think of these links as more relevant to gene regulatory interactions.
-
-NB: the code commented below are actually performed in the mentioned chapter earlier: "Calling Peaks (point 9 & 10 in manual)"
-
-```{r}
-#done previously for integration of our own RNA samples
-# #add peak-to-gene links
-# projMulti4 <- addPeak2GeneLinks(
-#     ArchRProj = projMulti4,
-#     reducedDims = "LSI_Combined"
-# )
-```
-
-```{r}
-#done previously for integration of our own RNA samples
-# #retrieve those peak-to-gene links
-# p2g <- getPeak2GeneLinks(
-#     ArchRProj = projMulti4,
-#     corCutOff = 0.45,
-#     resolution = 1,
-#     returnLoops = FALSE
-# )
-```
-
-```{r}
-#p2g
-```
-
-```{r}
-# #The indexes of idxATAC mentioned above apply to this GRanges object
-#metadata(p2g)[[1]]
-```
-
-```{r}
-# #returns loop track GRanges object
-# p2g <- getPeak2GeneLinks(
-#     ArchRProj = projMulti4,
-#     corCutOff = 0.45,
-#     resolution = 1,
-#     returnLoops = TRUE
-# )
-# 
-# p2g[[1]]
-```
 
 
 #### Plotting browser tracks with peak-to-gene links
 
 ```{r}
-# markerGenes <- c("Kcnd2", #from Jakub's list
-#                  "Olfm3",
-#                  "Tenm1",
-#                             #from ranked df from chunk above (MeanDiff)
-#                  "Zfp36l2", #C1
-#                  "Pacrg", #C2
-#                  "Rnf220", #C3
-#                  "Zbtb16", #C4
-#                  "Cbln1", #C6
-#                  "Neurod1" #C7
-#                  )
+# markerGenes <- c()
 
 p <- plotBrowserTrack(
     ArchRProj = projMulti4, 
@@ -2164,27 +2111,22 @@ p <- plotPeak2GeneHeatmap(ArchRProj = projMulti4,
 
 The heatmap rows are clustered using k-means clustering based on the value passed to the parameter k, which defaults to 25 as shown below.
 
-```{r}
-#plot
-p
-```
-
 
 ```{r}
 #save plot
 plotPDF(p, 
         name = "Heatmap-coaccessibility-ATAC-RNA.pdf", 
         ArchRProj = projMulti4, 
-        addDOC = FALSE)
+        addDOC = FALSE,
+        height = 10,
+        width = 15)
 ```
 
 
 ### Identification of Positive TF-Regulators (point 15.4 in manual)
 
 - When **RNA-seq not available** in the experiment: use chromVAR deviation z-scores of TF motifs (using "Gene activity matrix")
-
 or
-
 - When **RNA-seq available** in the experiment: use scRNA-seq gene expression of the TF
 
 #### Step1. Identify Deviant TF Motifs
