@@ -193,10 +193,21 @@ p_multi_frags
 ## Create subgroups by condition
 
 ```{r}
+projMulti1@cellColData$Sample
+```
+
+
+```{r}
+#adding conditions Flight vs Ground as a CellColData
+projMulti1 <- addCellColData(ArchRProj = projMulti1, data = paste0(gsub("0|1|2|3|4|5|6|7|8|9","", projMulti1@cellColData$Sample)), name = "Conditions", cells = getCellNames(projMulti1), force = TRUE)
+```
+
+
+```{r}
 #Have to know how to "group" the samples. Here, we want to remove the numbers after CF1,2,7 or CG8,9 
-bioNames <- gsub("0|1|2|3|4|5|6|7|8|9","", projMulti1$Sample)
-unique(bioNames)
-projMulti1$Conditions <- bioNames
+# bioNames <- gsub("0|1|2|3|4|5|6|7|8|9","", projMulti1$Sample)
+# unique(bioNames)
+# projMulti1$Conditions <- bioNames
 ```
 
 ```{r}
@@ -215,17 +226,25 @@ p_frags
 
 
 ```{r}
-nCells_conditions <- data.frame(sample = projMulti1@cellColData@listData[["Conditions"]]@values,
-                        nCells = projMulti1@cellColData@listData[["Conditions"]]@lengths)
+#Count per sample
+table(projMulti1@cellColData$Sample)
+```
 
-nCells_conditions[order(nCells_conditions$sample),] #order the df before printing it
+
+```{r}
+#Count per condition
+condition_table <- table(projMulti1@cellColData$Conditions)
+condition_table <- as.data.frame(condition_table)
+condition_table <- setnames(condition_table, c("Condition", "nCount"))
+condition_table
 ```
 
 ```{r}
-ggplot(nCells_conditions,
-       aes(x = sample, y = nCells)) +
-    geom_bar(stat = "identity") +
-    ggtitle("Number of cells per condition")
+ggplot(condition_table,                                 
+       aes(x = Condition,
+           y = nCount)) + 
+  geom_bar(stat = "identity")+
+  ggtitle("Number of cells per condition")
 ```
 
 ```{r}
@@ -2307,7 +2326,7 @@ from the definitions stored in "predictedGroup_Un_3"
 
 ```{r}
 #print again every unique cell types in "predictedGroup_Un_3"
-unique(projMulti3@cellColData@listData[["predictedGroup_Un_3"]])
+unique(projMulti4@cellColData@listData[["predictedGroup_Un_3"]])
 ```
 
 
@@ -2517,7 +2536,7 @@ assay(trajCombined, withDimnames=FALSE) <- t(apply(assay(trajGSM2), 1, scale)) +
 
 ```{r}
 #extract the optimal row order from the return of the plotTrajectoryHeatmap() function
-combinedMat <- plotTrajectoryHeatmap(seTrajectory = trajCombined)
+combinedMat <- plotTrajectoryHeatmap(seTrajectory = trajCombined, returnMatrix = TRUE, varCutOff = 0)
 #or used row "trajCombined"
 ```
 
