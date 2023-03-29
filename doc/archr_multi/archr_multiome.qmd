@@ -26,6 +26,10 @@ and: https://www.archrproject.com/bookdown/getting-started-with-archr.html
 loading ArchR, setting up our genome (`hg38`, `mm10`, ...), threads (which are system dependent so you should change that based on your computational resources), and our random seed (produce same set of random numbers).
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 library(ArchR)
 #addArchRGenome("hg38") #for human
 addArchRGenome("mm10") #for mouse
@@ -72,6 +76,10 @@ inputFiles
 create ArrowFiles from the scATAC-seq fragment files
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 ArrowFiles <- createArrowFiles(
   inputFiles = inputFiles, #contains only the ATAC data for now
   sampleNames = names(inputFiles), #names(atacFiles) #if you use mock dataset
@@ -90,6 +98,10 @@ Note: At this stage, in the working directory figures a repository containing qu
 create an `ArchRProject` object from those ArrowFiles
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 projMulti1 <- ArchRProject(ArrowFiles = ArrowFiles)
 ```
 
@@ -107,6 +119,10 @@ We provide two options which are controlled by the `strictMatch` parameter.
 - `strictMatch = TRUE` which will remove the offending genes from all samples.
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #create an ArchR object containing the RNA data.
 
 #setwd("/Users/raphael.mauron/archr/archr_multiome/multiome_data") #path to data when working on server.
@@ -255,6 +271,10 @@ rm(p_sample, p_frags, p_cond)
 
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #save project since we will change project now
 saveArchRProject(ArchRProj = projMulti1, outputDirectory = "Save-ProjMulti1", load = F)
 ```
@@ -277,6 +297,10 @@ length(which(getCellNames(projMulti1) %ni% colnames(seRNA)))
 remove these cells from our project. We do this using the `subsetArchRProject()` function and saving this as a new `ArchRProject` called `projMulti2`.
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 cellsToKeep <- which(getCellNames(projMulti1) %in% colnames(seRNA))
 projMulti2 <- subsetArchRProject(
     ArchRProj = projMulti1, 
@@ -290,6 +314,10 @@ The next thing that we want to do is add this scRNA-seq data to our `ArchRProjec
 When `strictMatch = TRUE`, this will ensure that all cells in the `ArchRProject` are also represented in the `seRNA` object. This is a nice fail-safe to make sure that the above project subsetting went smoothly. If `strictMatch = FALSE` (the default), then this function will merely throw a warning telling you that not all of your cells have scRNA-seq information and that this could cause problems downstream.
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #adding the RNA data to the project together with the ATAC data
 projMulti2 <- addGeneExpressionMatrix(input = projMulti2, seRNA = seRNA, strictMatch = TRUE, force = TRUE)
 ```
@@ -321,6 +349,10 @@ perform dimensionality reduction using `addIterativeLSI()`. We can do this on th
 LSI = Latent Semantic Indexing
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #LSI ATAC
 projMulti2 <- addIterativeLSI(
   ArchRProj = projMulti2, 
@@ -338,6 +370,10 @@ projMulti2 <- addIterativeLSI(
 
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #LSI RNA
 projMulti2 <- addIterativeLSI(
   ArchRProj = projMulti2, 
@@ -371,6 +407,10 @@ projMulti2 <- addCombinedDims(projMulti2, reducedDims = c("LSI_ATAC", "LSI_RNA")
 We can create UMAP embeddings for each of these dimensionality reductions.
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #generate UMAP from the reduced dimensions performed with LSI
 projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_ATAC", name = "UMAP_ATAC", minDist = 0.8, force = TRUE)
 projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_RNA", name = "UMAP_RNA", minDist = 0.8, force = TRUE)
@@ -383,6 +423,10 @@ projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_Combined", name = "UMAP_Com
 And then call clusters for each.
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_ATAC", name = "Clusters_ATAC", resolution = 0.4, force = TRUE)
 projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_RNA", name = "Clusters_RNA", resolution = 0.4, force = TRUE)
 projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_Combined", name = "Clusters_Combined", resolution = 0.4, force = TRUE)
@@ -400,6 +444,10 @@ It gives an idea of the data obtained from reduced dimension with:
 Clusters calculated above are colored.
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 p1 <- plotEmbedding(projMulti2, name = "Clusters_Combined", embedding = "UMAP_ATAC", size = 1, labelAsFactors=F, labelMeans=F)
 p2 <- plotEmbedding(projMulti2, name = "Clusters_Combined", embedding = "UMAP_RNA", size = 1, labelAsFactors=F, labelMeans=F)
 p3 <- plotEmbedding(projMulti2, name = "Clusters_Combined", embedding = "UMAP_Combined", size = 1, labelAsFactors=F, labelMeans=F)
@@ -416,7 +464,8 @@ p <- lapply(list(p1,p2,p3), function(x){
     )
 })
 
-do.call(cowplot::plot_grid, c(list(ncol = 3),p))
+#do.call(cowplot::plot_grid, c(list(ncol = 3),p))
+rm(p)
 ```
 
 
@@ -458,19 +507,23 @@ rm(p_atac_rna)
 ### UMAP-plot
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #plot by sample and by clusters
 p1 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Sample", embedding = "UMAP_Combined")
-p1
+#p1
 
 p2 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Clusters_Combined", embedding = "UMAP_Combined")
-p2
+#p2
 
 p3 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Conditions", embedding = "UMAP_Combined", alpha = 0.5, pal = c("CF" = "white","CG" = "green"))
-p3
+#p3
 p4 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Conditions", embedding = "UMAP_Combined", alpha = 0.5, pal = c("CF" = "blue","CG" = "white"))
-p4
+#p4
 p5 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Conditions", embedding = "UMAP_Combined", alpha = 0.35, pal = c("CF" = "blue","CG" = "green"))
-p5
+#p5
 ```
 
 
@@ -487,6 +540,10 @@ Helps for more dense clusters
 (Not the same as LSI)
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #Harmony 
 projMulti2 <- addHarmony(
   ArchRProj = projMulti2,
@@ -503,6 +560,10 @@ projMulti2 <- addHarmony(
 ### UMAP
 
 ```{r}
+#| message: false
+#| warning: false
+#| output: false
+
 #dimensionality reduction (Harmony, not LSI)
 projMulti2 <- addUMAP(
   ArchRProj = projMulti2,
@@ -546,16 +607,16 @@ p5 <- plotEmbedding(ArchRProj = projMulti2,
                     embedding = "UMAPHarmony",
                      alpha = 0.35, pal = c("CF" = "blue","CG" = "white")
                     )
-p1
-p2
-p3
-p4
-p5
+#p1
+#p2
+#p3
+#p4
+#p5
 ```
 
 ```{r}
 #save plot
-plotPDF(p1, p2, p3, p4, p5, name = "Harmony-Combined-sample-clusters", addDOC = FALSE)
+plotPDF(p1, p2, p3, p4, p5, name = "UMAP-Harmony-Combined-sample-clusters", addDOC = FALSE)
 rm(p1, p2, p3, p4, p5)
 ```
 
@@ -677,7 +738,6 @@ my_markers <- unique(my_markers)
 #| warning: false
 #| output: false
 
-
 #bias correction
 se <- getMarkerFeatures(ArchRProj = projMulti2,
                         groupBy = "Clusters_Combined",
@@ -695,7 +755,7 @@ heatmap_gex <- plotMarkerHeatmap(
   labelMarkers = my_markers #c("Gba", "Lrrk2", "Pink1", "Uchl1", "Vps35")#specify the markers you want a label on
   )
 
-draw(heatmap_gex, heatmap_legend_side = "bot", annotation_legend_side = "bot")
+#draw(heatmap_gex, heatmap_legend_side = "bot", annotation_legend_side = "bot")
 ```
 
 
@@ -959,8 +1019,8 @@ p1_1 <- plotEmbedding(
     pal = paletteDiscrete(values = unique(projMulti3@cellColData@listData[["predictedGroup_Un_1"]]), set = "stallion2")
 )
 
-p1
-p1_1
+#p1
+#p1_1
 ```
 
 
@@ -991,39 +1051,7 @@ p2 <- plotEmbedding(
     pal = paletteDiscrete(values = unique(projMulti3@cellColData@listData[["predictedGroup_Un_2"]]))
 )
 
-p2
-```
-
-
-```{r}
-#| message: false
-#| warning: false
-#| output: false
-
-#TaxonomyRank3
-projMulti3 <- addGeneIntegrationMatrix(
-    ArchRProj = projMulti2, 
-    useMatrix = "GeneExpressionMatrix",
-    matrixName = "GeneIntegrationMatrix_db_3",
-    reducedDims = "Harmony", #"LSI_Combined"
-    seRNA = se_RNA_mousebrain_data,
-    addToArrow = TRUE, #set TRUE to the Taonomy you want to add to the ArrowFiles
-    force = TRUE, #to allow rerun
-    groupRNA = "TaxonomyRank3",
-    nameCell = "predictedCell_Un_3",
-    nameGroup = "predictedGroup_Un_3",
-    nameScore = "predictedScore_Un_3"
-)
-
-p3 <- plotEmbedding(
-    projMulti3,
-    colorBy = "cellColData",
-    name = "predictedGroup_Un_3",
-    embedding = "UMAPHarmony",
-    pal = paletteDiscrete(values = unique(projMulti3@cellColData@listData[["predictedGroup_Un_3"]]))
-)
-
-p3
+#p2
 ```
 
 
@@ -1056,8 +1084,41 @@ p4 <- plotEmbedding(
 
 )
 
-p4
+#p4
 ```
+
+
+```{r}
+#| message: false
+#| warning: false
+#| output: false
+
+#TaxonomyRank3
+projMulti3 <- addGeneIntegrationMatrix(
+    ArchRProj = projMulti2, 
+    useMatrix = "GeneExpressionMatrix",
+    matrixName = "GeneIntegrationMatrix_db_3",
+    reducedDims = "Harmony", #"LSI_Combined"
+    seRNA = se_RNA_mousebrain_data,
+    addToArrow = TRUE, #set TRUE to the Taonomy you want to add to the ArrowFiles
+    force = TRUE, #to allow rerun
+    groupRNA = "TaxonomyRank3",
+    nameCell = "predictedCell_Un_3",
+    nameGroup = "predictedGroup_Un_3",
+    nameScore = "predictedScore_Un_3"
+)
+
+p3 <- plotEmbedding(
+    projMulti3,
+    colorBy = "cellColData",
+    name = "predictedGroup_Un_3",
+    embedding = "UMAPHarmony",
+    pal = paletteDiscrete(values = unique(projMulti3@cellColData@listData[["predictedGroup_Un_3"]]))
+)
+
+#p3
+```
+
 
 ```{r}
 #save plot
@@ -1067,11 +1128,60 @@ plotPDF(p1, p1_1, p2, p3, p4,
         addDOC = FALSE,
         width = 5,
         height = 5)
-rm(p1, p2, p3, p4)
+rm(p1, p1_1, p2, p3, p4)
+```
+
+
+```{r}
+#new category which specifies the condition and the cell type
+# Condition_CellType
+projMulti3 <- addCellColData(
+    ArchRProj = projMulti3, 
+    data = gsub(" ", "_", paste0(projMulti3@cellColData$Conditions, "_x_", projMulti3@cellColData$predictedGroup_Un_3)), 
+    name = "Condition_CellType", 
+    cells = getCellNames(projMulti3), 
+    force = TRUE)
+
+projMulti3 <- addCellColData(
+    ArchRProj = projMulti3, 
+    data = gsub(" ", "_", paste0(projMulti3@cellColData$predictedGroup_Un_3, "_x_", projMulti3@cellColData$Conditions)), 
+    name = "CellType_Condition", 
+    cells = getCellNames(projMulti3), 
+    force = TRUE)
+
+#return the unique tags from this new category
+unique(projMulti3@cellColData@listData[["CellType_Condition"]])
 ```
 
 ```{r}
-addCellColData()
+df_cond_cell <- as.data.frame(table(projMulti3@cellColData@listData[["CellType_Condition"]]))
+df_cond_cell <- setnames(df_cond_cell, c("CellType_Condition", "nCells"))
+df_cond_cell <- df_cond_cell %>% add_column(Conditions = c("CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG"))
+df_cond_cell
+```
+
+```{r}
+p_cond <- ggplot(df_cond_cell,                                 
+       aes(x = CellType_Condition,
+           y = nCells,
+           color = Conditions)) + 
+  geom_bar(stat = "identity")+
+  ggtitle("Number of cells per condition") +
+    theme(axis.text.x = element_text(angle = 60, hjust=1)) +
+    scale_fill_manual("Condition", values = c("CF" = "blue", "CG" = "green"))
+p_cond
+```
+
+
+```{r}
+#save plot
+plotPDF(p_cond, 
+        name = "Plot-nCells_Condition_CellType.pdf", 
+        ArchRProj = projMulti3,
+        addDOC = FALSE,
+        width = 20,
+        height = 10)
+rm(p_cond)
 ```
 
 
