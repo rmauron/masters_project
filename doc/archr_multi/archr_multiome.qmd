@@ -132,17 +132,20 @@ seRNA <- import10xFeatureMatrix(
 ### QC
 
 ```{r}
-nCells_df <- data.frame(sample = projMulti1@cellColData@listData[["Sample"]]@values,
-                        nCells = projMulti1@cellColData@listData[["Sample"]]@lengths)
-nCells_df[order(nCells_df$sample),]
+#Count per condition
+condition_sample <- table(projMulti1@cellColData$Sample)
+condition_sample <- as.data.frame(condition_sample)
+condition_sample <- setnames(condition_sample, c("Sample", "nCells"))
+condition_sample
 ```
 
 
 ```{r}
-ggplot(nCells_df,
-       aes(x = sample, y = nCells)) +
+p_sample <- ggplot(condition_sample,
+       aes(x = Sample, y = nCells)) +
     geom_bar(stat = "identity")+
     ggtitle("Number of cells per sample")
+#p_sample
 ```
 
 
@@ -162,7 +165,7 @@ p_frags <- plotGroups(
     addBoxPlot = T,
     log = F
 )
-p_frags
+#p_frags
 
 p_TSS <- plotGroups(
     projMulti1,
@@ -173,7 +176,7 @@ p_TSS <- plotGroups(
     alpha = 0.4,
     addBoxPlot = T
 )
-p_TSS
+#p_TSS
 
 p_multi_frags <- plotGroups(
     projMulti1,
@@ -184,17 +187,17 @@ p_multi_frags <- plotGroups(
     alpha = 0.4,
     addBoxPlot = T
 )
-p_multi_frags
-
-#rm(p_frags, p_multi_frags, p_TSS)
+#p_multi_frags
 ```
 
-
-## Create subgroups by condition
 
 ```{r}
-projMulti1@cellColData$Sample
+#save plot
+plotPDF(p_frags, p_TSS, p_multi_frags, name = "QC-sample", addDOC = FALSE)
+rm(p_frags, p_multi_frags, p_TSS)
 ```
+
+## Create subgroups by condition
 
 
 ```{r}
@@ -210,6 +213,7 @@ projMulti1 <- addCellColData(ArchRProj = projMulti1, data = paste0(gsub("0|1|2|3
 # projMulti1$Conditions <- bioNames
 ```
 
+
 ```{r}
 p_frags <- plotGroups(
     projMulti1,
@@ -221,13 +225,7 @@ p_frags <- plotGroups(
     addBoxPlot = T,
     log = F
 )
-p_frags
-```
-
-
-```{r}
-#Count per sample
-table(projMulti1@cellColData$Sample)
+#p_frags
 ```
 
 
@@ -235,17 +233,26 @@ table(projMulti1@cellColData$Sample)
 #Count per condition
 condition_table <- table(projMulti1@cellColData$Conditions)
 condition_table <- as.data.frame(condition_table)
-condition_table <- setnames(condition_table, c("Condition", "nCount"))
-condition_table
+condition_table <- setnames(condition_table, c("Condition", "nCells"))
+#condition_table
 ```
 
 ```{r}
-ggplot(condition_table,                                 
+p_cond <- ggplot(condition_table,                                 
        aes(x = Condition,
-           y = nCount)) + 
+           y = nCells)) + 
   geom_bar(stat = "identity")+
   ggtitle("Number of cells per condition")
+#p_cond
 ```
+
+
+```{r}
+#save plot
+plotPDF(p_sample, p_frags, p_cond, name = "QC-condition-sample", addDOC = FALSE)
+rm(p_sample, p_frags, p_cond)
+```
+
 
 ```{r}
 #save project since we will change project now
@@ -418,6 +425,7 @@ We can also save this to a PDF file.
 ```{r}
 #save plot
 plotPDF(p1, p2, p3, name = "UMAP-scATAC-scRNA-Combined", addDOC = FALSE)
+rm(p1, p2, p3)
 ```
 
 
@@ -441,6 +449,7 @@ p_atac_rna <- pheatmap::pheatmap(
 ```{r}
 #save plot
 plotPDF(p_atac_rna, name = "Confusion-Matrix-scATAC-scRNA", addDOC = FALSE)
+rm(p_atac_rna)
 ```
 
 
@@ -468,6 +477,7 @@ p5
 ```{r}
 #save plot
 plotPDF(p1, p2, p3, p4, p5, name = "UMAP-Combined-sample-clusters", addDOC = FALSE)
+rm(p1, p2, p3, p4)
 ```
 
 
@@ -546,6 +556,7 @@ p5
 ```{r}
 #save plot
 plotPDF(p1, p2, p3, p4, p5, name = "Harmony-Combined-sample-clusters", addDOC = FALSE)
+rm(p1, p2, p3, p4, p5)
 ```
 
 
@@ -695,6 +706,7 @@ plotPDF(heatmap_gex,
         width = 12,
         height = 7,
         addDOC = FALSE)
+rm(heatmap_gex)
 ```
 
 
@@ -758,6 +770,7 @@ plotPDF(plotList = p,
         addDOC = FALSE,
         width = 5,
         height = 5)
+rm(p)
 ```
 
 
@@ -823,6 +836,7 @@ plotPDF(plotList = p,
         addDOC = FALSE,
         width = 5,
         height = 5)
+rm(p)
 ```
 
 
@@ -856,6 +870,7 @@ plotPDF(plotList = p,
         addDOC = FALSE,
         width = 5,
         height = 5)
+rm(p)
 ```
 
 
@@ -1052,6 +1067,7 @@ plotPDF(p1, p1_1, p2, p3, p4,
         addDOC = FALSE,
         width = 5,
         height = 5)
+rm(p1, p2, p3, p4)
 ```
 
 
@@ -1193,6 +1209,7 @@ heatmapPeaks <- plotMarkerHeatmap(
 ```{r}
 #save plot
 plotPDF(heatmapPeaks, name = "Peak-Marker-Heatmap", width = 8, height = 6, ArchRProj = projMulti4, addDOC = FALSE)
+rm(heatmapPeaks)
 ```
 
 
@@ -1224,8 +1241,7 @@ cell_type <- cell
 
 plotPDF(pv, name = gsub(" ", "-",paste(plot_type, cell_type)), width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
 }
-rm(plot_type)
-rm(cell_type)
+rm(plot_type, cell_type)
 ```
 
 
@@ -1291,6 +1307,7 @@ pv <- plotMarkers(
 ```{r}
 #save plots
 plotPDF(pv, name = "Conditions-PeakMarkers-Volcano", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+rm(pv)
 ```
 
 
@@ -1330,6 +1347,7 @@ pv <- plotMarkers(
 ```{r}
 #save plots
 plotPDF(pv, name = "Conditions-GeneExpression-Volcano", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+rm(pv)
 ```
 
 
@@ -1502,6 +1520,7 @@ ggDo <- ggplot(df, aes(rank, mlog10Padj, color = mlog10Padj)) +
 ```{r}
 #save plots
 plotPDF(ggUp, ggUp_cond, ggDo, name = "Motifs-Enriched-plot", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+rm(ggUp, ggUp_cond, ggDo)
 ```
 
 
@@ -1540,6 +1559,7 @@ heatmapEM <- plotEnrichHeatmap(enrichMotifs,
 ```{r}
 #save plot
 plotPDF(heatmapEM, name = "Motifs-Enriched-Marker-Heatmap", width = 8, height = 6, ArchRProj = projMulti4, addDOC = FALSE)
+rm(heatmapEM)
 ```
 
 
@@ -1609,6 +1629,7 @@ plotVarDev <- getVarDeviations(projMulti4, name = "MotifMatrix", plot = TRUE)
 ```{r}
 #save plot
 plotPDF(plotVarDev, name = "Variable-Motif-Deviation-Scores", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+rm(plotVarDev)
 ```
 
 
@@ -1677,6 +1698,7 @@ p2 <- lapply(seq_along(p), function(x){
 ```{r}
 #save plot
 plotPDF(p, name = "Plot-Groups-Deviations-w-Imputation", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+rm(p)
 ```
 
 
@@ -1716,6 +1738,7 @@ p2 <- lapply(p, function(x){
 ```{r}
 #save plot
 plotPDF(p, name = "Plot-Groups-Deviations-w-Z-score-embedding", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+rm(p)
 ```
 
 
@@ -1765,6 +1788,7 @@ p2 <- lapply(p, function(x){
 ```{r}
 #save plot
 plotPDF(p, name = "Plot-Groups-Deviations-w-GeneExpression-embedding", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+rm(p)
 ```
 
 
@@ -1821,6 +1845,7 @@ plotPDF(plotList = p,
     name = "linked-gene-expression-of-TF.pdf", 
     ArchRProj = projMulti4, 
     addDOC = FALSE, width = 5, height = 5)
+rm(p)
 ```
 
 
@@ -2059,8 +2084,8 @@ p <- plotBrowserTrack(
 
 ```{r}
 #to open in browser
-grid::grid.newpage()
-grid::grid.draw(p$Dkk3)
+# grid::grid.newpage()
+# grid::grid.draw(p$Dkk3)
 ```
 
 
@@ -2070,6 +2095,7 @@ plotPDF(plotList = p,
     name = "Plot-Tracks-Marker-Genes-with-CoAccessibility.pdf", 
     ArchRProj = projMulti4, 
     addDOC = FALSE, width = 5, height = 5)
+rm(p)
 ```
 
 
@@ -2107,11 +2133,15 @@ grid::grid.draw(p$Kcnd2)
 
 
 ```{r}
+#| message: false
+#| warning: false
+
 #save plots
 plotPDF(plotList = p, 
     name = "Plot-Tracks-Marker-Genes-with-Peak2GeneLinks.pdf", 
     ArchRProj = projMulti4, 
     addDOC = FALSE, width = 5, height = 5)
+rm(p)
 ```
 
 
@@ -2132,6 +2162,9 @@ The heatmap rows are clustered using k-means clustering based on the value passe
 
 
 ```{r}
+#| message: false
+#| warning: false
+
 #save plot
 plotPDF(p, 
         name = "Heatmap-coaccessibility-ATAC-RNA.pdf", 
@@ -2139,6 +2172,7 @@ plotPDF(p,
         addDOC = FALSE,
         height = 10,
         width = 15)
+rm(p)
 ```
 
 
@@ -2378,6 +2412,7 @@ plotPDF(p,
         name = "Plot-Oligodendrocytes-Traj-UMAP.pdf", 
         ArchRProj = projMulti4, 
         addDOC = FALSE, width = 5, height = 5)
+rm(p)
 ```
 
 
@@ -2415,14 +2450,18 @@ Comparing these UMAP plots side-by-side for the gene score and gene expression, 
 
 
 ```{r}
-ggAlignPlots(p1[[1]], p2[[1]], type = "h")
+p_umap_traj <- ggAlignPlots(p1[[1]], p2[[1]], type = "h")
 ```
 
 
 The second plot that is returned by plotTrajectory() is a dot plot of pseudo-time versus the value of the relevant feature, in this case, the gene score or gene expression of the gene. In this case, the cells are colored by their pseudo-time.
 
 ```{r}
-ggAlignPlots(p1[[2]], p2[[2]], type = "h")
+p_traj <- ggAlignPlots(p1[[2]], p2[[2]], type = "h")
+```
+
+```{r}
+savePDF(p_umap_traj, p_traj, name = "trajectory-umap-pseudotime", ArchRProj = projMulti4)
 ```
 
 
@@ -2438,6 +2477,9 @@ We will create these pseudo-time heatmaps for:
 by passing the corresponding matrix to the useMatrix parameter.
 
 ```{r}
+#| message: false
+#| warning: false
+
 #pseudo-time for motifs
 trajMM  <- getTrajectory(ArchRProj = projMulti4, 
                          name = "Oligodendrocytes", 
@@ -2447,12 +2489,17 @@ trajMM  <- getTrajectory(ArchRProj = projMulti4,
 
 
 ```{r}
-p1 <- plotTrajectoryHeatmap(trajMM, 
-                            pal = paletteContinuous(set = "solarExtra"))
+#| message: false
+#| warning: false
+
+p1 <- plotTrajectoryHeatmap(trajMM, pal = paletteContinuous(set = "solarExtra"))
 ```
 
 
 ```{r}
+#| message: false
+#| warning: false
+
 #Pseudo-time for Gene Expression
 trajGSM <- getTrajectory(ArchRProj = projMulti4, 
                          name = "Oligodendrocytes", 
@@ -2462,11 +2509,17 @@ trajGSM <- getTrajectory(ArchRProj = projMulti4,
 
 
 ```{r}
-p2 <- trajectoryHeatmap(trajGSM,  pal = paletteContinuous(set = "horizonExtra"))
+#| message: false
+#| warning: false
+
+p2 <- plotTrajectoryHeatmap(trajGSM,  pal = paletteContinuous(set = "horizonExtra"))
 ```
 
 
 ```{r}
+#| message: false
+#| warning: false
+
 #PSeudo-time for Gene Integration
 trajGIM <- getTrajectory(ArchRProj = projMulti4, 
                          name = "Oligodendrocytes", 
@@ -2476,11 +2529,17 @@ trajGIM <- getTrajectory(ArchRProj = projMulti4,
 
 
 ```{r}
+#| message: false
+#| warning: false
+
 p3 <- plotTrajectoryHeatmap(trajGIM,  pal = paletteContinuous(set = "blueYellow"))
 ```
 
 
 ```{r}
+#| message: false
+#| warning: false
+
 #pseudo-time for "PeakMatrix"
 trajPM  <- getTrajectory(ArchRProj = projMulti4, 
                          name = "Oligodendrocytes", 
@@ -2490,6 +2549,9 @@ trajPM  <- getTrajectory(ArchRProj = projMulti4,
 
 
 ```{r}
+#| message: false
+#| warning: false
+
 p4 <- plotTrajectoryHeatmap(trajPM, pal = paletteContinuous(set = "solarExtra"))
 ```
 
@@ -2500,6 +2562,7 @@ plotPDF(p1, p2, p3, p4,
         name = "Plot-Oligodendrocytes-Traj-Heatmaps.pdf", 
         ArchRProj = projMulti4, 
         addDOC = FALSE, width = 6, height = 8)
+rm(p1, p2, p3, p4)
 ```
 
 
@@ -2508,6 +2571,9 @@ plotPDF(p1, p2, p3, p4,
 perform integrative analyses, such as identification of positive TF regulators by integration of gene scores / gene expression with motif accessibility across pseudo-time. 
 
 ```{r}
+#| message: false
+#| warning: false
+
 #find motifs whose accessibility across pseudo-time is correlated with the Gene Expression of the TF gene
 #trajectory at our disposal: trajGSM (GeneScoreMatrix/Expression), trajMM (MotifMatrix), trajGIM (GeneIntegrationMatrix),trajPM (PeakMatrix)
 corGSM_MM <- correlateTrajectories(trajGSM, trajMM, corCutOff = 0.1)
@@ -2515,6 +2581,9 @@ corGSM_MM <- correlateTrajectories(trajGSM, trajMM, corCutOff = 0.1)
 
 
 ```{r}
+#| message: false
+#| warning: false
+
 corGSM_MM[[1]]
 ```
 
@@ -2535,6 +2604,9 @@ assay(trajCombined, withDimnames=FALSE) <- t(apply(assay(trajGSM2), 1, scale)) +
 
 
 ```{r}
+#| message: false
+#| warning: false
+
 #extract the optimal row order from the return of the plotTrajectoryHeatmap() function
 combinedMat <- plotTrajectoryHeatmap(seTrajectory = trajCombined, returnMatrix = TRUE, varCutOff = 0)
 #or used row "trajCombined"
@@ -2550,6 +2622,9 @@ rowOrder <- match(rownames(trajCombined), rownames(trajGSM2))
 we are now ready to create our **paired heatmaps**. First, we will create the heatmap for the gene score trajectory. We specify the desired row order via the rowOrder parameter
 
 ```{r}
+#| message: false
+#| warning: false
+
 #heatmap for Gene Expression Trajectory
 ht1 <- plotTrajectoryHeatmap(trajGSM2,  
                              pal = paletteContinuous(set = "horizonExtra"),  
@@ -2560,6 +2635,9 @@ ht1 <- plotTrajectoryHeatmap(trajGSM2,
 
 
 ```{r}
+#| message: false
+#| warning: false
+
 #heatmap for the motif Trajectory
 ht2 <- plotTrajectoryHeatmap(trajMM2, 
                              pal = paletteContinuous(set = "solarExtra"), 
@@ -2570,7 +2648,13 @@ ht2 <- plotTrajectoryHeatmap(trajMM2,
 
 ```{r}
 #Plotting these two heatmaps side-by-side, we see that the rows are matched across the two heatmaps.
-ht1 + ht2
+p <- ht1 + ht2
+```
+
+
+```{r}
+plotPDF(p,name = "trajectory-heatmap",ArchRProj = projMulti4, addDOC = F)
+rm(p)
 ```
 
 
