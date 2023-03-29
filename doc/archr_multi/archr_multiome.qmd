@@ -1169,7 +1169,7 @@ p_cond <- ggplot(df_cond_cell,
   ggtitle("Number of cells per condition") +
     theme(axis.text.x = element_text(angle = 60, hjust=1)) #+
     #scale_fill_manual("Condition", values = c("CF" = "blue", "CG" = "green"))
-p_cond
+#p_cond
 ```
 
 
@@ -1186,6 +1186,8 @@ rm(p_cond)
 
 
 ```{r}
+#| warning: false
+#| message: false
 saveArchRProject(ArchRProj = projMulti3, outputDirectory = "Save-ProjMulti3", load = F)
 ```
 
