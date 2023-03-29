@@ -1070,6 +1070,10 @@ plotPDF(p1, p1_1, p2, p3, p4,
 rm(p1, p2, p3, p4)
 ```
 
+```{r}
+addCellColData()
+```
+
 
 ```{r}
 saveArchRProject(ArchRProj = projMulti3, outputDirectory = "Save-ProjMulti3", load = F)
@@ -2058,17 +2062,7 @@ cA[[1]]
 Can plot on the browser a list of our markerGenes
 
 ```{r}
-# markerGenes <- c("Kcnd2", #from Jakub's list
-#                  "Olfm3",
-#                  "Tenm1",
-#                             #from ranked df from chunk above (MeanDiff)
-#                  "Zfp36l2", #C1
-#                  "Pacrg", #C2
-#                  "Rnf220", #C3
-#                  "Zbtb16", #C4
-#                  "Cbln1", #C6
-#                  "Neurod1" #C7
-#                  )
+# markerGenes <- c()
 markerGenes <- my_markers
 
 p <- plotBrowserTrack(
@@ -2128,7 +2122,7 @@ p <- plotBrowserTrack(
 ```{r}
 #plot browser track
 grid::grid.newpage()
-grid::grid.draw(p$Kcnd2)
+grid::grid.draw(p$Dkk3)
 ```
 
 
@@ -2153,6 +2147,9 @@ To visualize the correspondence of all of our **peak-to-gene links**, we can plo
 - one for our scRNA-seq data
 
 ```{r}
+#| message: false
+#| warning: false
+
 p <- plotPeak2GeneHeatmap(ArchRProj = projMulti4, 
                           groupBy = "predictedGroup_Un_3")
 ```
@@ -2186,6 +2183,9 @@ or
 Did that when creating "MotifMatrix"
 
 ```{r}
+#| message: false
+#| warning: false
+
 #retrieve this data (deviant TF motifs)
 seGroupMotif <- getGroupSE(ArchRProj = projMulti4, 
                            useMatrix = "MotifMatrix", 
@@ -2216,7 +2216,7 @@ rowData(seZ)$maxDelta <- lapply(seq_len(ncol(seZ)), function(x){
 
 #### Step2. Identify Correlated TF Motifs and TF Gene Score/Expression
 
-To identify TFs whose motif accessibility is correlated with with their own gene activity (either by gene score or gene expression), we use the correlateMatrices() function and provide the **two matrices that we are interested in, in this case the GeneScoreMatrix and the MotifMatrix**.
+To identify TFs whose motif accessibility is correlated with their own gene activity (either by gene score or gene expression), we use the correlateMatrices() function and provide the **two matrices that we are interested in, in this case the GeneScoreMatrix and the MotifMatrix**.
 
 correlations are determined across many low-overlapping cell aggregates determined in the lower dimension space specified in the reducedDims parameter
 
@@ -2336,7 +2336,7 @@ ArchR creates cellular trajectories that order cells across a lower N-dimensiona
 #review clusters and cell types that we defined and stored in cellColData in columns "Clusters" and "Clusters2"
 p1 <- plotEmbedding(ArchRProj = projMulti4, 
                     colorBy = "cellColData", 
-                    name = "predictedGroup_Un_3", 
+                    name = "Conditions", 
                     embedding = "UMAPHarmony")
 ```
 
@@ -2366,12 +2366,15 @@ unique(projMulti4@cellColData@listData[["predictedGroup_Un_3"]])
 
 ```{r}
 #define trajectory backbone of cell types to access
-trajectory <- c("Oligodendrocyte precursor cells", "Oligodendrocytes")
+trajectory <- c("Oligodendrocytes", "Telencephalon projecting neurons")
 trajectory
 ```
 
 
 ```{r}
+#| message: false
+#| warning: false
+
 #add trajectory to project
 #creates a new column in cellColData called "MyeloidU" (name = ...) that stores the pseudo-time value for each cell in the trajectory
 projMulti4 <- addTrajectory(
