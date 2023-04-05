@@ -36,6 +36,7 @@ addArchRGenome("mm10") #for mouse
 library(BSgenome.Mmusculus.UCSC.mm10)
 addArchRThreads(32) #rocommended 1/2 of total available cores
 set.seed(1)
+#projMulti1 <- loadArchRProject(path = "./Save-ProjMulti1", force = FALSE, showLogo = TRUE)
 ```
 
 
@@ -151,7 +152,8 @@ seRNA <- import10xFeatureMatrix(
 #Count per condition
 condition_sample <- table(projMulti1@cellColData$Sample)
 condition_sample <- as.data.frame(condition_sample)
-condition_sample <- setnames(condition_sample, c("Sample", "nCells"))
+condition_sample <- cbind(condition_sample, before_filter = c("before", "before", "before", "before", "before"))
+condition_sample <- setnames(condition_sample, c("Sample", "nCells", "filter"))
 condition_sample
 ```
 
@@ -340,6 +342,33 @@ cat("A total of", nCells(projMulti1)-nCells(projMulti2), "doublets were removed.
 ```
 
 
+```{r}
+#Count per condition
+condition_after_filter <- table(projMulti2@cellColData$Sample)
+condition_after_filter <- as.data.frame(condition_after_filter)
+condition_after_filter <- cbind(condition_after_filter, after_filter = c("after", "after", "after", "after", "after"))
+condition_after_filter <- setnames(condition_after_filter, c("Sample", "nCells", "filter"))
+condition_after_filter
+#condition_sample
+
+filter_diff <- condition_sample[,"nCells"] - condition_after_filter[,"nCells"]
+filter_df <- as.data.frame(cbind(Sample = c("CF1", "CF2", "CF7", "CG8", "CG9"),
+                   nCells = filter_diff,
+                   filter = c("diff", "diff", "diff", "diff", "diff")))
+
+super_frame <- rbind(condition_sample, filter_df)
+#super_frame <- super_frame[order(super_frame$Sample),]
+
+
+ggplot(super_frame, aes(fill=filter, y=nCells, x=Sample)) + 
+    geom_bar(position="stack", stat="identity") +
+    #scale_fill_viridis(discrete = T) +
+    ggtitle("Sample before after QC") +
+    theme_ipsum() +
+    xlab("")
+
+```
+
 ## Analysis of multiome data in ArchR
 
 ### Dimensionality reduction (point 4 in manual)
@@ -364,7 +393,8 @@ projMulti2 <- addIterativeLSI(
   saveIterations = FALSE,
   useMatrix = "TileMatrix",
   depthCol = "nFrags",
-  name = "LSI_ATAC"
+  name = "LSI_ATAC",
+  force = T
 )
 ```
 
@@ -388,7 +418,9 @@ projMulti2 <- addIterativeLSI(
   varFeatures = 2500,
   firstSelection = "variable",
   binarize = FALSE,
-  name = "LSI_RNA"
+  scaleDims = FALSE,
+  name = "LSI_RNA",
+  force = T
 )
 ```
 
@@ -412,9 +444,9 @@ We can create UMAP embeddings for each of these dimensionality reductions.
 #| output: false
 
 #generate UMAP from the reduced dimensions performed with LSI
-projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_ATAC", name = "UMAP_ATAC", minDist = 0.8, force = TRUE)
-projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_RNA", name = "UMAP_RNA", minDist = 0.8, force = TRUE)
-projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_Combined", name = "UMAP_Combined", minDist = 0.8, force = TRUE)
+projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_ATAC", name = "UMAP_ATAC", minDist = 0.1, force = TRUE)
+projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_RNA", name = "UMAP_RNA", minDist = 0.1, force = TRUE)
+projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_Combined", name = "UMAP_Combined", minDist = 0.1, force = TRUE)
 ```
 
 
@@ -427,9 +459,9 @@ And then call clusters for each.
 #| warning: false
 #| output: false
 
-projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_ATAC", name = "Clusters_ATAC", resolution = 0.4, force = TRUE)
-projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_RNA", name = "Clusters_RNA", resolution = 0.4, force = TRUE)
-projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_Combined", name = "Clusters_Combined", resolution = 0.4, force = TRUE)
+projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_ATAC", name = "Clusters_ATAC", resolution = 0.4,maxClusters = 20, force = TRUE)
+projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_RNA", name = "Clusters_RNA", resolution = 0.4, maxClusters = 20,force = TRUE)
+projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_Combined", name = "Clusters_Combined", resolution = 0.4, maxClusters = 20, force = TRUE)
 ```
 
 
@@ -448,8 +480,8 @@ Clusters calculated above are colored.
 #| warning: false
 #| output: false
 
-p1 <- plotEmbedding(projMulti2, name = "Clusters_Combined", embedding = "UMAP_ATAC", size = 1, labelAsFactors=F, labelMeans=F)
-p2 <- plotEmbedding(projMulti2, name = "Clusters_Combined", embedding = "UMAP_RNA", size = 1, labelAsFactors=F, labelMeans=F)
+p1 <- plotEmbedding(projMulti2, name = "Clusters_ATAC", embedding = "UMAP_ATAC", size = 1, labelAsFactors=F, labelMeans=F)
+p2 <- plotEmbedding(projMulti2, name = "Clusters_RNA", embedding = "UMAP_RNA", size = 1, labelAsFactors=F, labelMeans=F)
 p3 <- plotEmbedding(projMulti2, name = "Clusters_Combined", embedding = "UMAP_Combined", size = 1, labelAsFactors=F, labelMeans=F)
 
 p <- lapply(list(p1,p2,p3), function(x){
@@ -504,7 +536,7 @@ rm(p_atac_rna)
 
 ## Embedding by sample & by clusters
 
-### UMAP-plot
+### UMAP-plot COMBINED
 
 ```{r}
 #| message: false
@@ -512,17 +544,17 @@ rm(p_atac_rna)
 #| output: false
 
 #plot by sample and by clusters
-p1 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Sample", embedding = "UMAP_Combined")
+p1 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColData", name = "Sample", embedding = "UMAP_Combined")
 #p1
 
-p2 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Clusters_Combined", embedding = "UMAP_Combined")
+p2 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColData", name = "Clusters_Combined", embedding = "UMAP_Combined")
 #p2
 
-p3 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Conditions", embedding = "UMAP_Combined", alpha = 0.5, pal = c("CF" = "white","CG" = "green"))
+p3 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColData", name = "Conditions", embedding = "UMAP_Combined", alpha = 0.5, pal = c("CF" = "white","CG" = "green"))
 #p3
-p4 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Conditions", embedding = "UMAP_Combined", alpha = 0.5, pal = c("CF" = "blue","CG" = "white"))
+p4 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColData", name = "Conditions", embedding = "UMAP_Combined", alpha = 0.5, pal = c("CF" = "blue","CG" = "white"))
 #p4
-p5 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Conditions", embedding = "UMAP_Combined", alpha = 0.35, pal = c("CF" = "blue","CG" = "green"))
+p5 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColData", name = "Conditions", embedding = "UMAP_Combined", alpha = 0.35, pal = c("CF" = "blue","CG" = "green"))
 #p5
 ```
 
@@ -530,6 +562,65 @@ p5 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColDAta", name = "Con
 ```{r}
 #save plot
 plotPDF(p1, p2, p3, p4, p5, name = "UMAP-Combined-sample-clusters", addDOC = FALSE)
+rm(p1, p2, p3, p4)
+```
+
+### UMAP-plot ATAC
+
+```{r}
+#| message: false
+#| warning: false
+#| output: false
+
+#plot by sample and by clusters
+p1 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColData", name = "Sample", embedding = "UMAP_ATAC")
+#p1
+
+p2 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColData", name = "Clusters_ATAC", embedding = "UMAP_ATAC")
+#p2
+
+p3 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColData", name = "Conditions", embedding = "UMAP_ATAC", alpha = 0.5, pal = c("CF" = "white","CG" = "green"))
+#p3
+p4 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColData", name = "Conditions", embedding = "UMAP_ATAC", alpha = 0.5, pal = c("CF" = "blue","CG" = "white"))
+#p4
+p5 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColData", name = "Conditions", embedding = "UMAP_ATAC", alpha = 0.35, pal = c("CF" = "blue","CG" = "green"))
+#p5
+```
+
+
+```{r}
+#save plot
+plotPDF(p1, p2, p3, p4, p5, name = "UMAP-ATAC-sample-clusters", addDOC = FALSE)
+rm(p1, p2, p3, p4)
+```
+
+
+### UMAP-plot RNA
+
+```{r}
+#| message: false
+#| warning: false
+#| output: false
+
+#plot by sample and by clusters
+p1 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColData", name = "Sample", embedding = "UMAP_RNA")
+#p1
+
+p2 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColData", name = "Clusters_RNA", embedding = "UMAP_RNA")
+#p2
+
+p3 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColData", name = "Conditions", embedding = "UMAP_RNA", alpha = 0.5, pal = c("CF" = "white","CG" = "green"))
+#p3
+p4 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColData", name = "Conditions", embedding = "UMAP_RNA", alpha = 0.5, pal = c("CF" = "blue","CG" = "white"))
+#p4
+p5 <- plotEmbedding(ArchRProj = projMulti2, colorBy = "cellColData", name = "Conditions", embedding = "UMAP_RNA", alpha = 0.35, pal = c("CF" = "blue","CG" = "green"))
+#p5
+```
+
+
+```{r}
+#save plot
+plotPDF(p1, p2, p3, p4, p5, name = "UMAP-RNA-sample-clusters", addDOC = FALSE)
 rm(p1, p2, p3, p4)
 ```
 
@@ -544,11 +635,30 @@ Helps for more dense clusters
 #| warning: false
 #| output: false
 
-#Harmony 
+#Harmony Combined
 projMulti2 <- addHarmony(
   ArchRProj = projMulti2,
   reducedDims = "LSI_Combined",
   name = "Harmony",
+  groupBy = "Sample",
+  vars_use = "Sample",
+  force = T
+)
+
+#Harmony ATAC
+projMulti2 <- addHarmony(
+  ArchRProj = projMulti2,
+  reducedDims = "LSI_ATAC",
+  name = "Harmony_ATAC",
+  groupBy = "Sample",
+  force = T
+)
+
+#Harmony RNA
+projMulti2 <- addHarmony(
+  ArchRProj = projMulti2,
+  reducedDims = "LSI_RNA",
+  name = "Harmony_RNA",
   groupBy = "Sample",
   force = T
 )
@@ -564,19 +674,43 @@ projMulti2 <- addHarmony(
 #| warning: false
 #| output: false
 
-#dimensionality reduction (Harmony, not LSI)
+#dimensionality reduction (Harmony, not LSI) COMBINED
 projMulti2 <- addUMAP(
   ArchRProj = projMulti2,
   reducedDims = "Harmony",
   name = "UMAPHarmony",
-  nNeighbors = 30,
-  minDist = 0.5,
+  nNeighbors = 40,
+  minDist = 0.1,
+  metric = "cosine",
+  force = T
+)
+
+#dimensionality reduction (Harmony, not LSI) ATAC
+projMulti2 <- addUMAP(
+  ArchRProj = projMulti2,
+  reducedDims = "Harmony_ATAC",
+  name = "UMAPHarmony_ATAC",
+  nNeighbors = 40,
+  minDist = 0.1,
+  metric = "cosine",
+  force = T
+)
+
+#dimensionality reduction (Harmony, not LSI) RNA
+projMulti2 <- addUMAP(
+  ArchRProj = projMulti2,
+  reducedDims = "Harmony_RNA",
+  name = "UMAPHarmony_RNA",
+  nNeighbors = 40,
+  minDist = 0.1,
   metric = "cosine",
   force = T
 )
 ```
 
+
 ### Harmony-UMAP-plot
+#### Combined
 
 ```{r}
 p1 <- plotEmbedding(ArchRProj = projMulti2, 
@@ -593,18 +727,66 @@ p3 <- plotEmbedding(ArchRProj = projMulti2,
                     colorBy = "cellColData", 
                     name = "Conditions", 
                     embedding = "UMAPHarmony",
+                    alpha = 0.35, pal = c("CF" = "blue","CG" = "green")
+                    )
+
+p4 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Conditions", 
+                    embedding = "UMAPHarmony",
+                    alpha = 0.35, pal = c("CF" = "white","CG" = "green")
+                    )
+
+p5 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Conditions", 
+                    embedding = "UMAPHarmony",
+                    alpha = 0.35, pal = c("CF" = "blue","CG" = "white")
+                    )
+#p1
+#p2
+#p3
+#p4
+#p5
+```
+
+
+```{r}
+#save plot
+plotPDF(p1, p2, p3, p4, p5, name = "UMAP-Harmony-Combined-sample-clusters", addDOC = FALSE)
+rm(p1, p2, p3, p4, p5)
+```
+
+
+#### ATAC
+
+```{r}
+p1 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Sample", 
+                    embedding = "UMAPHarmony_ATAC")
+
+p2 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Clusters_ATAC", 
+                    embedding = "UMAPHarmony_ATAC")
+
+p3 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Conditions", 
+                    embedding = "UMAPHarmony_ATAC",
                      alpha = 0.35, pal = c("CF" = "blue","CG" = "green")
                     )
 p4 <- plotEmbedding(ArchRProj = projMulti2, 
                     colorBy = "cellColData", 
                     name = "Conditions", 
-                    embedding = "UMAPHarmony",
+                    embedding = "UMAPHarmony_ATAC",
                      alpha = 0.35, pal = c("CF" = "white","CG" = "green")
                     )
 p5 <- plotEmbedding(ArchRProj = projMulti2, 
                     colorBy = "cellColData", 
                     name = "Conditions", 
-                    embedding = "UMAPHarmony",
+                    embedding = "UMAPHarmony_ATAC",
                      alpha = 0.35, pal = c("CF" = "blue","CG" = "white")
                     )
 #p1
@@ -614,9 +796,58 @@ p5 <- plotEmbedding(ArchRProj = projMulti2,
 #p5
 ```
 
+
 ```{r}
 #save plot
-plotPDF(p1, p2, p3, p4, p5, name = "UMAP-Harmony-Combined-sample-clusters", addDOC = FALSE)
+plotPDF(p1, p2, p3, p4, p5, name = "UMAP-Harmony-ATAC-sample-clusters", addDOC = FALSE)
+rm(p1, p2, p3, p4, p5)
+```
+
+
+#### RNA
+
+```{r}
+p1 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Sample", 
+                    embedding = "UMAPHarmony_RNA")
+
+p2 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Clusters_RNA", 
+                    embedding = "UMAPHarmony_RNA")
+
+p3 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Conditions", 
+                    embedding = "UMAPHarmony_RNA",
+                    alpha = 0.35, pal = c("CF" = "blue","CG" = "green")
+                    )
+
+p4 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Conditions", 
+                    embedding = "UMAPHarmony_RNA",
+                    alpha = 0.35, pal = c("CF" = "white","CG" = "green")
+                    )
+
+p5 <- plotEmbedding(ArchRProj = projMulti2, 
+                    colorBy = "cellColData", 
+                    name = "Conditions", 
+                    embedding = "UMAPHarmony_RNA",
+                    alpha = 0.35, pal = c("CF" = "blue","CG" = "white")
+                    )
+#p1
+#p2
+#p3
+#p4
+#p5
+```
+
+
+```{r}
+#save plot
+plotPDF(p1, p2, p3, p4, p5, name = "UMAP-Harmony-RNA-sample-clusters", addDOC = FALSE)
 rm(p1, p2, p3, p4, p5)
 ```
 
@@ -943,7 +1174,7 @@ saveArchRProject(ArchRProj = projMulti2, outputDirectory = "Save-ProjMulti2", lo
 ```{r}
 #load the project from last saved project (if necessary)
 #library(ArchR)
-#projMulti2 <- loadArchRProject(path = "./Save-ProjMulti2", force = FALSE, showLogo = TRUE)
+projMulti2 <- loadArchRProject(path = "./Save-ProjMulti2", force = FALSE, showLogo = TRUE)
 ```
 
 ## Annotate cells (point 8 in manual)
@@ -1194,8 +1425,8 @@ saveArchRProject(ArchRProj = projMulti3, outputDirectory = "Save-ProjMulti3", lo
 
 ```{r}
 #load the project from last saved project (if necessary)
-# library(ArchR)
-# projMulti3 <- loadArchRProject(path = "./Save-ProjMulti3", force = FALSE, showLogo = TRUE)
+#library(ArchR)
+#projMulti3 <- loadArchRProject(path = "./Save-ProjMulti3", force = FALSE, showLogo = TRUE)
 ```
 
 
@@ -1218,7 +1449,8 @@ projMulti4 <- addGroupCoverages(
 projMulti4 <- addReproduciblePeakSet(
     ArchRProj = projMulti4, 
     groupBy = "Clusters_Combined", #in CellColData, 
-    pathToMacs2 = "/Users/raphaelmauron/Library/Python/3.9/bin/macs2")
+    pathToMacs2 = "/usr/local/bin/macs2"#"/Users/raphaelmauron/Library/Python/3.9/bin/macs2"
+        )
 
 #add peaks just found
 projMulti4 <- addPeakMatrix(ArchRProj = projMulti4)
@@ -1247,8 +1479,57 @@ getAvailableMatrices(projMulti4)
 
 ```{r}
 #Our scRNA labels to remind ourselves of the cell types that we are working with in projMulti4
-table(projMulti4@cellColData@listData[["predictedGroup_Un_3"]])
+table(projMulti4@cellColData@listData[["CellType_Condition"]])
 ```
+
+
+```{r}
+#pairwise testing withing "Cholinergic,_monoaminergic_and_peptidergic_neurons" cluster
+marker_Cholinergic <- getMarkerFeatures(
+  ArchRProj = projMulti4, 
+  useMatrix = "PeakMatrix",
+  groupBy = "CellType_Condition",
+  testMethod = "wilcoxon",
+  bias = c("TSSEnrichment", 
+            "log10(nFrags)", 
+            "log10(Gex_nUMI)"),
+  useGroups = "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CF",
+  bgdGroups = "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CG"
+)
+
+
+marker_Cholinergic_significant <- as.data.frame(marker_Cholinergic@assays@data@listData)
+marker_Cholinergic_significant <- setnames(marker_Cholinergic_significant, c("Log2FC", "Mean", "FDR", "Pval", "MeanDiff", "AUC", "MeanBGD"))
+marker_Cholinergic_significant <- marker_Cholinergic_significant[
+    ((marker_Cholinergic_significant$FDR <= 0.5) & (marker_Cholinergic_significant$Log2FC >= 1)),] #& (marker_Cholinergic_significant$Log2FC >= 1 | marker_Cholinergic_significant$Log2FC <= 1 )),]
+marker_Cholinergic_significant <- marker_Cholinergic_significant[
+    ((marker_Cholinergic_significant$Log2FC >= 1)),]
+marker_Cholinergic_significant <- marker_Cholinergic_significant %>% drop_na()
+```
+
+
+```{r}
+
+#pairwise testing withing "Cholinergic,_monoaminergic_and_peptidergic_neurons" cluster
+marker_Oligodendrocytes <- getMarkerFeatures(
+  ArchRProj = projMulti4, 
+  useMatrix = "PeakMatrix",
+  groupBy = "CellType_Condition",
+  testMethod = "wilcoxon",
+  bias = c("TSSEnrichment", 
+            "log10(nFrags)", 
+            "log10(Gex_nUMI)"),
+  useGroups = "Oligodendrocytes_x_CF",
+  bgdGroups = "Oligodendrocytes_x_CG"
+)
+
+marker_Oligodendrocytes_significant <- as.data.frame(marker_Oligodendrocytes@assays@data@listData)
+marker_Oligodendrocytes_significant <- setnames(marker_Oligodendrocytes_significant, c("Log2FC", "Mean", "FDR", "Pval", "MeanDiff", "AUC", "MeanBGD"))
+marker_Oligodendrocytes_significant <- marker_Oligodendrocytes_significant[
+    ((marker_Oligodendrocytes_significant$FDR <= 0.1) & (marker_Oligodendrocytes_significant$Log2FC >= 1 | marker_Oligodendrocytes_significant$Log2FC <= 1 )),]
+marker_Oligodendrocytes_significant <- marker_Oligodendrocytes_significant %>% drop_na()
+```
+
 
 
 ```{r}
@@ -1295,6 +1576,20 @@ markerList
 
 ```{r}
 #markerList$Oligodendrocytes #change cell type
+```
+
+```{r}
+#return a GRangesList instead of a DataFrame object.
+markerList_Cholinergic <- getMarkers(marker_Cholinergic, 
+                         cutOff = "FDR <= 0.01 & Log2FC >= 1", 
+                         returnGR = TRUE)
+markerList_Cholinergic
+
+
+markerList_Oligodendrocytes <- getMarkers(marker_Oligodendrocytes, 
+                         cutOff = "FDR <= 0.01 & Log2FC >= 1", 
+                         returnGR = TRUE)
+markerList_Oligodendrocytes
 ```
 
 
@@ -1361,6 +1656,28 @@ rm(plot_type, cell_type)
 ```
 
 
+```{r}
+pv <- plotMarkers(
+    seMarker = marker_Cholinergic,
+    name = "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CF", #change cell name
+    cutOff = "FDR <= 0.1 & (Log2FC >= 1 | Log2FC <= 1)",
+    plotAs = "Volcano" #MA
+    ) +
+    ggtitle("Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CF") +
+    ylab("-log10(FDR)") +
+    xlab("Log2 Fold Change")
+print(pv)
+
+
+pv <- plotMarkers(
+    seMarker = marker_Oligodendrocytes,
+    name = "Oligodendrocytes_x_CF", #change cell name
+    cutOff = "(FDR <= 0.1) & (Log2FC >= 1 | Log2FC <= 1)",
+    plotAs = "Volcano" #MA
+    ) + ggtitle("Oligodendrocytes_x_CF")
+print(pv)
+```
+
 ### Pairwise Testing Between Groups
 
 !!! ArchR also enables standard differential testing using the same getMarkerFeatures() function. The trick is to set useGroups to one of the two cell groups and bgdGroups to the other cell group.
@@ -1414,9 +1731,9 @@ markersPeaksCondition <- getMarkerFeatures(
 pv <- plotMarkers(
     seMarker = markersPeaksCondition,
     name = "CF", #change cell type
-    cutOff = "FDR <= 0.1 & abs(Log2FC) >= 0.5",#"FDR <= 0.1 & abs(Log2FC) >= 0.5",
+    cutOff = "(FDR <= 0.1) & (Log2FC >= 1 | Log2FC <= 1)",#"FDR <= 0.1 & abs(Log2FC) >= 0.5",
     plotAs = "Volcano")
-#pv
+pv
 ```
 
 
@@ -1454,9 +1771,9 @@ markersGenesCondition <- getMarkerFeatures(
 pv <- plotMarkers(
     seMarker = markersGenesCondition,
     name = "CF", #change cell type
-    cutOff = "FDR <= 0.1 & abs(Log2FC) >= 0.5",#"FDR <= 0.1 & abs(Log2FC) >= 0.5",
+    cutOff = "(FDR <= 0.001) & (Log2FC >= 1 | Log2FC <= 1)",#"FDR <= 0.1 & abs(Log2FC) >= 0.5",
     plotAs = "Volcano")
-#pv
+pv
 ```
 
 
@@ -1502,7 +1819,7 @@ motifsUp <- peakAnnoEnrichment(
     seMarker = markersPeaks, #markerTest,
     ArchRProj = projMulti4,
     peakAnnotation = "Motif",
-    cutOff = "FDR <= 0.1 & Log2FC >= 1"
+    cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
   )
 
 #motifs enrichment from differential testing among conditions
@@ -1510,35 +1827,166 @@ motifsUpCondition <- peakAnnoEnrichment(
     seMarker = markersPeaksCondition, #markerTest,
     ArchRProj = projMulti4,
     peakAnnotation = "Motif",
-    cutOff = "FDR <= 0.1 & Log2FC >= 1"
+    cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
+  )
+
+motifsUp_Cholinergic <- peakAnnoEnrichment(
+    seMarker = marker_Cholinergic, #markerTest,
+    ArchRProj = projMulti4,
+    peakAnnotation = "Motif",
+    cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
+  )
+
+motifsUp_Oligodendrocytes <- peakAnnoEnrichment(
+    seMarker = marker_Oligodendrocytes, #markerTest,
+    ArchRProj = projMulti4,
+    peakAnnotation = "Motif",
+    cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
+  )
+
+#based on the markerTest from previous analysis or the entire markerPeaks
+motifsDown <- peakAnnoEnrichment(
+    seMarker = markersPeaks, #markerTest,
+    ArchRProj = projMulti4,
+    peakAnnotation = "Motif",
+    cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
+  )
+
+#motifs enrichment from differential testing among conditions
+motifsDownCondition <- peakAnnoEnrichment(
+    seMarker = markersPeaksCondition, #markerTest,
+    ArchRProj = projMulti4,
+    peakAnnotation = "Motif",
+    cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
+  )
+
+motifsDown_Cholinergic <- peakAnnoEnrichment(
+    seMarker = marker_Cholinergic, #markerTest,
+    ArchRProj = projMulti4,
+    peakAnnotation = "Motif",
+    cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
+  )
+
+motifsDown_Oligodendrocytes <- peakAnnoEnrichment(
+    seMarker = marker_Oligodendrocytes, #markerTest,
+    ArchRProj = projMulti4,
+    peakAnnotation = "Motif",
+    cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
   )
 ```
 
-
+### Motifs up among every cells
+#### CF
 ```{r}
 #To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
-df <- data.frame(TF = rownames(motifsUp), mlog10Padj = assay(motifsUp)[,1])
-df <- df[order(df$mlog10Padj, decreasing = TRUE),]
-df$rank <- seq_len(nrow(df))
-```
-
-
-```{r}
-#to test the most enriched motifs in the peaks 
-head(df)
-```
-
-```{r}
-#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
-df_cond <- data.frame(TF = rownames(motifsUpCondition), mlog10Padj = assay(motifsUpCondition)[,1])
-df_cond <- df_cond[order(df_cond$mlog10Padj, decreasing = TRUE),]
-df_cond$rank <- seq_len(nrow(df_cond))
+df_CF <- data.frame(TF = rownames(motifsUp), mlog10Padj = assay(motifsUp)[,1])
+df_CF <- df_CF[order(df_CF$mlog10Padj, decreasing = TRUE),]
+df_CF$rank <- seq_len(nrow(df_CF))
 ```
 
 ```{r}
 #to test the most enriched motifs in the peaks 
-head(df_cond)
+head(df_CF)
 ```
+
+#### CG
+```{r}
+#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
+df_CG <- data.frame(TF = rownames(motifsDown), mlog10Padj = assay(motifsDown)[,1])
+df_CG <- df_CG[order(df_CG$mlog10Padj, decreasing = TRUE),]
+df_CG$rank <- seq_len(nrow(df_CG))
+```
+
+```{r}
+#to test the most enriched motifs in the peaks 
+head(df_CG)
+```
+
+
+### Motifs up among conditions
+#### CF
+```{r}
+#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
+df_cond_CF <- data.frame(TF = rownames(motifsUpCondition), mlog10Padj = assay(motifsUpCondition)[,1])
+df_cond_CF <- df_cond_CF[order(df_cond_CF$mlog10Padj, decreasing = TRUE),]
+df_cond_CF$rank <- seq_len(nrow(df_cond_CF))
+```
+
+```{r}
+#to test the most enriched motifs in the peaks 
+head(df_cond_CF)
+```
+
+#### CG
+```{r}
+#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
+df_cond_CG <- data.frame(TF = rownames(motifsDownCondition), mlog10Padj = assay(motifsDownCondition)[,1])
+df_cond_CG <- df_cond_CG[order(df_cond_CG$mlog10Padj, decreasing = TRUE),]
+df_cond_CG$rank <- seq_len(nrow(df_cond_CG))
+```
+
+```{r}
+#to test the most enriched motifs in the peaks 
+head(df_cond_CG)
+```
+
+
+### Motifs up in Cholinergic cells
+#### CF
+```{r}
+#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
+df_Cholinergic_CF <- data.frame(TF = rownames(motifsUp_Cholinergic), mlog10Padj = assay(motifsUp_Cholinergic)[,1])
+df_Cholinergic_CF <- df_Cholinergic_CF[order(df_Cholinergic_CF$mlog10Padj, decreasing = TRUE),]
+df_Cholinergic_CF$rank <- seq_len(nrow(df_Cholinergic_CF))
+```
+
+```{r}
+#to test the most enriched motifs in the peaks 
+head(df_Cholinergic_CF)
+```
+
+#### CG
+```{r}
+#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
+df_Cholinergic_CG <- data.frame(TF = rownames(motifsDown_Cholinergic), mlog10Padj = assay(motifsDown_Cholinergic)[,1])
+df_Cholinergic_CG <- df_Cholinergic_CG[order(df_Cholinergic_CG$mlog10Padj, decreasing = TRUE),]
+df_Cholinergic_CG$rank <- seq_len(nrow(df_Cholinergic_CG))
+```
+
+```{r}
+#to test the most enriched motifs in the peaks 
+head(df_Cholinergic_CG)
+```
+
+
+### Motifs up in Oligodendrocytes
+#### CF
+```{r}
+#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
+df_Oligodendrocytes_CF <- data.frame(TF = rownames(motifsUp_Oligodendrocytes), mlog10Padj = assay(motifsUp_Oligodendrocytes)[,1])
+df_Oligodendrocytes_CF <- df_Oligodendrocytes_CF[order(df_Oligodendrocytes_CF$mlog10Padj, decreasing = TRUE),]
+df_Oligodendrocytes_CF$rank <- seq_len(nrow(df_Oligodendrocytes_CF))
+```
+
+```{r}
+#to test the most enriched motifs in the peaks 
+head(df_Oligodendrocytes_CF)
+```
+
+#### CG
+```{r}
+#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
+df_Oligodendrocytes_CG <- data.frame(TF = rownames(motifsDown_Oligodendrocytes), mlog10Padj = assay(motifsDown_Oligodendrocytes)[,1])
+df_Oligodendrocytes_CG <- df_Oligodendrocytes_CG[order(df_Oligodendrocytes_CG$mlog10Padj, decreasing = TRUE),]
+df_Oligodendrocytes_CG$rank <- seq_len(nrow(df_Oligodendrocytes_CG))
+```
+
+```{r}
+#to test the most enriched motifs in the peaks 
+head(df_Oligodendrocytes_CG)
+```
+
+
 
 
 ```{r}
@@ -1549,11 +1997,10 @@ options(ggrepel.max.overlaps = Inf)
 
 ```{r}
 #Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
-
-ggUp <- ggplot(df, aes(rank, mlog10Padj, color = mlog10Padj)) + 
+ggUp_CF <- ggplot(df_CF, aes(rank, mlog10Padj, color = mlog10Padj)) + 
   geom_point(size = 1) +
   ggrepel::geom_label_repel(
-        data = df[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
+        data = df_CF[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
         size = 1.5,
         nudge_x = 2,
         color = "black",
@@ -1562,19 +2009,37 @@ ggUp <- ggplot(df, aes(rank, mlog10Padj, color = mlog10Padj)) +
   ylab("-log10(P-adj) Motif Enrichment") + 
   xlab("Rank Sorted TFs Enriched") +
   scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
-    ggtitle("Motif enrichment among every cells")
+    ggtitle("Motif enrichment among every cells in CF")
 
-#ggUp
+ggUp_CF
+```
+
+```{r}
+#Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
+ggUp_CG <- ggplot(df_CG, aes(rank, mlog10Padj, color = mlog10Padj)) + 
+  geom_point(size = 1) +
+  ggrepel::geom_label_repel(
+        data = df_CG[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
+        size = 1.5,
+        nudge_x = 2,
+        color = "black",
+
+  ) + theme_ArchR() + 
+  ylab("-log10(P-adj) Motif Enrichment") + 
+  xlab("Rank Sorted TFs Enriched") +
+  scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
+    ggtitle("Motif enrichment among every cells in CG")
+
+ggUp_CG
 ```
 
 
 ```{r}
 #Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
-
-ggUp_cond <- ggplot(df_cond, aes(rank, mlog10Padj, color = mlog10Padj)) + 
+ggUp_cond_CF <- ggplot(df_cond_CF, aes(rank, mlog10Padj, color = mlog10Padj)) + 
   geom_point(size = 1) +
   ggrepel::geom_label_repel(
-        data = df_cond[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
+        data = df_cond_CF[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
         size = 1.5,
         nudge_x = 2,
         color = "black",
@@ -1585,58 +2050,113 @@ ggUp_cond <- ggplot(df_cond, aes(rank, mlog10Padj, color = mlog10Padj)) +
   scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
     ggtitle("Motif enrichment in CF")
 
-#ggUp_cond
+ggUp_cond_CF
 ```
 
 
 ```{r}
-#| message: false
-#| warning: false
-
-# for the peaks that are more accessible in the "CG" cells by using peaks with Log2FC <= -0.5
-motifsDo <- peakAnnoEnrichment(
-    seMarker = markersPeaksCondition,
-    ArchRProj = projMulti4,
-    peakAnnotation = "Motif",
-    cutOff = "FDR <= 0.1 & Log2FC <= -1"
-  )
-```
-
-
-```{r}
-df <- data.frame(TF = rownames(motifsDo), mlog10Padj = assay(motifsDo)[,1])
-df <- df[order(df$mlog10Padj, decreasing = TRUE),]
-df$rank <- seq_len(nrow(df))
-```
-
-
-```{r}
-head(df)
-```
-
-
-```{r}
-ggDo <- ggplot(df, aes(rank, mlog10Padj, color = mlog10Padj)) + 
+#Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
+ggUp_cond_CG <- ggplot(df_cond_CG, aes(rank, mlog10Padj, color = mlog10Padj)) + 
   geom_point(size = 1) +
   ggrepel::geom_label_repel(
-        data = df[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
+        data = df_cond_CG[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
         size = 1.5,
         nudge_x = 2,
-        color = "black"
+        color = "black",
+
   ) + theme_ArchR() + 
-  ylab("-log10(FDR) Motif Enrichment") +
+  ylab("-log10(P-adj) Motif Enrichment") + 
   xlab("Rank Sorted TFs Enriched") +
-  scale_color_gradientn(colors = paletteContinuous(set = "comet"))+
+  scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
     ggtitle("Motif enrichment in CG")
 
-#ggDo
+ggUp_cond_CG
 ```
 
+
+```{r}
+#Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
+ggUp_Cholinergic_CF <- ggplot(df_Cholinergic_CF, aes(rank, mlog10Padj, color = mlog10Padj)) + 
+  geom_point(size = 1) +
+  ggrepel::geom_label_repel(
+        data = df_Cholinergic_CF[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
+        size = 1.5,
+        nudge_x = 2,
+        color = "black",
+
+  ) + theme_ArchR() + 
+  ylab("-log10(P-adj) Motif Enrichment") + 
+  xlab("Rank Sorted TFs Enriched") +
+  scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
+    ggtitle("Motif enrichment in Cholinergic in CF")
+
+ggUp_Cholinergic_CF
+```
+
+
+```{r}
+#Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
+ggUp_Cholinergic_CG <- ggplot(df_Cholinergic_CG, aes(rank, mlog10Padj, color = mlog10Padj)) + 
+  geom_point(size = 1) +
+  ggrepel::geom_label_repel(
+        data = df_Cholinergic_CG[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
+        size = 1.5,
+        nudge_x = 2,
+        color = "black",
+
+  ) + theme_ArchR() + 
+  ylab("-log10(P-adj) Motif Enrichment") + 
+  xlab("Rank Sorted TFs Enriched") +
+  scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
+    ggtitle("Motif enrichment in Cholinergic in CG")
+
+ggUp_Cholinergic_CG
+```
+
+
+```{r}
+#Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
+ggUp_Oligodendrocytes_CF <- ggplot(df_Oligodendrocytes_CF, aes(rank, mlog10Padj, color = mlog10Padj)) + 
+  geom_point(size = 1) +
+  ggrepel::geom_label_repel(
+        data = df_Oligodendrocytes_CF[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
+        size = 1.5,
+        nudge_x = 2,
+        color = "black",
+
+  ) + theme_ArchR() + 
+  ylab("-log10(P-adj) Motif Enrichment") + 
+  xlab("Rank Sorted TFs Enriched") +
+  scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
+    ggtitle("Motif enrichment in Oligodendrocytes in CF")
+
+ggUp_Oligodendrocytes_CF
+```
+
+
+```{r}
+#Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
+ggUp_Oligodendrocytes_CG <- ggplot(df_Oligodendrocytes_CG, aes(rank, mlog10Padj, color = mlog10Padj)) + 
+  geom_point(size = 1) +
+  ggrepel::geom_label_repel(
+        data = df_Oligodendrocytes_CG[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
+        size = 1.5,
+        nudge_x = 2,
+        color = "black",
+
+  ) + theme_ArchR() + 
+  ylab("-log10(P-adj) Motif Enrichment") + 
+  xlab("Rank Sorted TFs Enriched") +
+  scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
+    ggtitle("Motif enrichment in Oligodendrocytes in CG")
+
+ggUp_Oligodendrocytes_CG
+```
 
 ```{r}
 #save plots
-plotPDF(ggUp, ggUp_cond, ggDo, name = "Motifs-Enriched-plot", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
-rm(ggUp, ggUp_cond, ggDo)
+plotPDF(ggUp_CF, ggUp_CG, ggUp_cond_CF, ggUp_cond_CG, ggUp_Cholinergic_CF, ggUp_Cholinergic_CG, ggUp_Oligodendrocytes_CF, ggUp_Oligodendrocytes_CG, name = "Motifs-Enriched-plot", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+rm(ggUp_CF, ggUp_CG, ggUp_cond_CF, ggUp_cond_CG, ggUp_Cholinergic_CF, ggUp_Cholinergic_CG, ggUp_Oligodendrocytes_CF, ggUp_Oligodendrocytes_CG)
 ```
 
 
