@@ -1013,7 +1013,31 @@ rm(heatmap_gex)
 
 #list of some markers 
 markerList <- getMarkers(se, cutOff = "FDR <= 0.01 & Log2FC >= 1.25") 
-markerList$C6 #change cluster here
+#markerList$C6 #change cluster here
+
+# gsub(" ", "-",paste(plot_type, cell_type))
+
+i <- 1
+for (cluster in 1:length(markerList@listData)) {
+    if (nrow(markerList@listData[[cluster]]["name"]) >= 20) {
+        if (i == 1) {
+            my_row <- head(markerList@listData[[cluster]]["name"],20)
+            df_top_20 <- as.data.frame(my_row)
+            colnames(df_top_20)[1] <- gsub(" ", "",paste("C", cluster))
+        } else {
+        df_top_20 <- cbind(df_top_20, head(markerList@listData[[cluster]]["name"],20))
+        colnames(df_top_20)[i] <- gsub(" ", "",paste("C", cluster))
+        }
+    } else {
+        next
+    }
+    i <- i + 1
+}
+rm(cluster, i)
+
+## ROWNAMEEEEEES
+rownames(df_top_20) <- range(1, 20)
+df_top_20
 ```
 
 
