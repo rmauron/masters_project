@@ -36,7 +36,7 @@ addArchRGenome("mm10") #for mouse
 library(BSgenome.Mmusculus.UCSC.mm10)
 addArchRThreads(32) #rocommended 1/2 of total available cores
 set.seed(1)
-#projMulti1 <- loadArchRProject(path = "./Save-ProjMulti1", force = FALSE, showLogo = TRUE)
+#projMulti1 <- loadArchRProject(path = "./Save-ProjMulti1", force = FALSE, showLogo = F)
 ```
 
 
@@ -285,7 +285,7 @@ saveArchRProject(ArchRProj = projMulti1, outputDirectory = "Save-ProjMulti1", lo
 ```{r}
 #load the project from last saved project (if necessary)
 #library(ArchR)
-#projMulti1 <- loadArchRProject(path = "./Save-ProjMulti1", force = FALSE, showLogo = TRUE)
+#projMulti1 <- loadArchRProject(path = "./Save-ProjMulti1", force = FALSE, showLogo = F)
 ```
 
 
@@ -394,6 +394,7 @@ projMulti2 <- addIterativeLSI(
   useMatrix = "TileMatrix",
   depthCol = "nFrags",
   name = "LSI_ATAC",
+  seed = 5,
   force = T
 )
 ```
@@ -420,6 +421,7 @@ projMulti2 <- addIterativeLSI(
   binarize = FALSE,
   scaleDims = FALSE,
   name = "LSI_RNA",
+  seed = 3,
   force = T
 )
 ```
@@ -444,9 +446,9 @@ We can create UMAP embeddings for each of these dimensionality reductions.
 #| output: false
 
 #generate UMAP from the reduced dimensions performed with LSI
-projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_ATAC", name = "UMAP_ATAC", minDist = 0.1, force = TRUE)
-projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_RNA", name = "UMAP_RNA", minDist = 0.1, force = TRUE)
-projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_Combined", name = "UMAP_Combined", minDist = 0.1, force = TRUE)
+projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_ATAC", name = "UMAP_ATAC", nNeighbors = 40, minDist = 0.1, force = TRUE)
+projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_RNA", name = "UMAP_RNA", nNeighbors = 40, minDist = 0.1, force = TRUE)
+projMulti2 <- addUMAP(projMulti2, reducedDims = "LSI_Combined", name = "UMAP_Combined", nNeighbors = 40, minDist = 0.1, force = TRUE)
 ```
 
 
@@ -459,9 +461,9 @@ And then call clusters for each.
 #| warning: false
 #| output: false
 
-projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_ATAC", name = "Clusters_ATAC", resolution = 0.4,maxClusters = 20, force = TRUE)
-projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_RNA", name = "Clusters_RNA", resolution = 0.4, maxClusters = 20,force = TRUE)
-projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_Combined", name = "Clusters_Combined", resolution = 0.4, maxClusters = 20, force = TRUE)
+projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_ATAC", name = "Clusters_ATAC", resolution = 0.3, maxClusters = 20, force = TRUE)
+projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_RNA", name = "Clusters_RNA", resolution = 0.3, maxClusters = 20,force = TRUE)
+projMulti2 <- addClusters(projMulti2, reducedDims = "LSI_Combined", name = "Clusters_Combined", resolution = 0.3, maxClusters = 20, force = TRUE)
 ```
 
 
@@ -641,7 +643,8 @@ projMulti2 <- addHarmony(
   reducedDims = "LSI_Combined",
   name = "Harmony",
   groupBy = "Sample",
-  vars_use = "Sample",
+  theta = 0.001,
+  lambda = 1,
   force = T
 )
 
@@ -651,6 +654,8 @@ projMulti2 <- addHarmony(
   reducedDims = "LSI_ATAC",
   name = "Harmony_ATAC",
   groupBy = "Sample",
+  theta = 0.001,
+  lambda = 1,
   force = T
 )
 
@@ -1174,7 +1179,7 @@ saveArchRProject(ArchRProj = projMulti2, outputDirectory = "Save-ProjMulti2", lo
 ```{r}
 #load the project from last saved project (if necessary)
 #library(ArchR)
-projMulti2 <- loadArchRProject(path = "./Save-ProjMulti2", force = FALSE, showLogo = TRUE)
+#projMulti2 <- loadArchRProject(path = "./Save-ProjMulti2", force = FALSE, showLogo = F)
 ```
 
 ## Annotate cells (point 8 in manual)
