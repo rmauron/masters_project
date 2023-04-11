@@ -1036,7 +1036,11 @@ for (cluster in 1:length(markerList@listData)) {
 rm(cluster, i)
 
 ## ROWNAMEEEEEES
-rownames(df_top_20) <- range(1, 20)
+for (row in 1:20) {
+    row_list <- append(row_list, gsub(" ", "",paste("MarkerGene", row)))
+}
+
+rownames(df_top_20) <- row_list
 df_top_20
 ```
 
