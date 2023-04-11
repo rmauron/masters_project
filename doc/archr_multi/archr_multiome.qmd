@@ -1346,7 +1346,7 @@ projMulti3 <- addGeneIntegrationMatrix(
     matrixName = "GeneIntegrationMatrix_db_4",
     reducedDims = "Harmony", #"LSI_Combined"
     seRNA = se_RNA_mousebrain_data,
-    addToArrow = TRUE, #set TRUE to the Taxonomy you want to add to the ArrowFiles
+    addToArrow = FALSE, #set TRUE to the Taxonomy you want to add to the ArrowFiles
     groupRNA = "TaxonomyRank4",
     nameCell = "predictedCell_Un_4",
     nameGroup = "predictedGroup_Un_4",
@@ -1434,14 +1434,14 @@ rm(p1, p1_1, p2, p2_1, p3, p3_1, p4, p4_1)
 # Condition_CellType
 projMulti3 <- addCellColData(
     ArchRProj = projMulti3, 
-    data = gsub(" ", "_", paste0(projMulti3@cellColData$Conditions, "_x_", projMulti3@cellColData$predictedGroup_Un_3)), 
+    data = gsub(" ", "_", paste0(projMulti3@cellColData$Conditions, "_x_", projMulti3@cellColData$predictedGroup_Un_4)), 
     name = "Condition_CellType", 
     cells = getCellNames(projMulti3), 
     force = TRUE)
 
 projMulti3 <- addCellColData(
     ArchRProj = projMulti3, 
-    data = gsub(" ", "_", paste0(projMulti3@cellColData$predictedGroup_Un_3, "_x_", projMulti3@cellColData$Conditions)), 
+    data = gsub(" ", "_", paste0(projMulti3@cellColData$predictedGroup_Un_4, "_x_", projMulti3@cellColData$Conditions)), 
     name = "CellType_Condition", 
     cells = getCellNames(projMulti3), 
     force = TRUE)
@@ -1452,7 +1452,8 @@ unique(projMulti3@cellColData@listData[["CellType_Condition"]])
 
 ```{r}
 df_cond_cell <- as.data.frame(table(projMulti3@cellColData@listData[["CellType_Condition"]]))
-df_cond_cell <- setnames(df_cond_cell, c("CellType_Condition", "nCells"))
+df_cond_cell <- cbind(df_cond_cell, projMulti3@cellColData@listData[["Sample"]]) #new
+df_cond_cell <- setnames(df_cond_cell, c("CellType_Condition", "nCells", "Sample")) #new
 df_cond_cell <- df_cond_cell %>% add_column(Conditions = c("CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG"))
 df_cond_cell
 ```
@@ -1461,12 +1462,12 @@ df_cond_cell
 p_cond <- ggplot(df_cond_cell,                                 
        aes(x = CellType_Condition,
            y = nCells,
-           fill = Conditions)) + 
+           fill = Sample)) + #new
   geom_bar(stat = "identity")+
   ggtitle("Number of cells per condition") +
-    theme(axis.text.x = element_text(angle = 60, hjust=1)) #+
-    #scale_fill_manual("Condition", values = c("CF" = "blue", "CG" = "green"))
-#p_cond
+    theme(axis.text.x = element_text(angle = 60, hjust=1))
+
+p_cond + coord_fixed(ratio = 0.3) #new
 ```
 
 
