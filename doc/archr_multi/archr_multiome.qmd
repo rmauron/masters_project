@@ -864,21 +864,6 @@ rm(p1, p2, p3, p4, p5)
 ```{r}
 #include your marker gene list here
 my_markers <- c(
-    # "Kcnd2", #Jakub markers
-    # "Olfm3",
-    # "Tenm1",
-    # "Zfp36l2", 
-    # "Pacrg", 
-    # "Rnf220", 
-    # "Zbtb16",
-    # "Cbln1", 
-    # "Neurod1",
-    # "Il1rl2", 
-    # "Cldn11", 
-    # "Cyp27a1", 
-    # "E330020D12Rik", 
-    # "Tfap2b",
-    
     "Wfs1", # RR3 markers
     "Dkk3",
     "Prox1",
@@ -896,48 +881,7 @@ my_markers <- c(
     "Nr2f6",
     "Hic1",
     "Sox6",
-    
-    # "Gfap",
-    # "Ppp1r17",
-    # "Eomes",
-    # "Neurod2",
-    # "Dlx2",
-    # "Hes1",
-    # "Limch1",
-    # "Runx1",
-    # "Sncb",
-    # "Dok5",
-    # "Jun",
-    # "Fos",
-    # "Klf16",
-    # "Sp1",
-    # "Sp2",
-    # "Ascl1",
-    # "Mef2c",
-    # "C9orf72",
-    # "Pax6",
-    # #"Top2a",
-    # "Vim",
-    # "Sox9",
-    # "Igfbp7",
-    # "Aqp4",
-    # "Fezf2",
-    # "Nfib",
-    # "Lhx6",
-    # "Gad1",
-    # "Neurod6",
-    # "Syt1",
-    # "Cntn2",
-    # "Pcdh20",
-    # "Myt1l",
-    # "Plxnd1",
-    # "Camk2b",
-    # "Shank2",
-    # "Ncam1",
-    # "Ccnd1",
-    # "Otx2",
-    # "Agt",
-    # "Apoe",
+
     # #Neurodegenerative disease marker
     # "CD33",
     # "PSEN1",
@@ -948,20 +892,6 @@ my_markers <- c(
     "PINK1",
     "UCHL1",
     "VPS35"
-    # "C9orf72",
-    # "FUS",
-    # "SOD1",
-    # "SQSTM1",
-    # 
-    # 
-    # "TYROBP",
-    # "P2RY12",
-    # "CX3CR1",
-    # "TMEM119",
-    # 
-    # "Axl",
-    # "CST7",
-    # "Spp1"
 )
 my_markers <- unique(my_markers)
 ```
@@ -976,7 +906,7 @@ my_markers <- unique(my_markers)
 
 #bias correction
 se <- getMarkerFeatures(ArchRProj = projMulti2,
-                        groupBy = "Clusters_Combined",
+                        groupBy = "Clusters_ATAC", #"Clusters_Combined",
                         bias = c("TSSEnrichment", #snATAC-seq data quality
                                  "log10(nFrags)", #read depth for snATAC 
                                  "log10(Gex_nUMI)") #read depth for snRNA 
@@ -1011,22 +941,20 @@ rm(heatmap_gex)
 #| message: false
 #| warning: false
 
-#list of some markers 
+# list of marker genes per cluster (ranked in comparison to the markers from the other markers)
 markerList <- getMarkers(se, cutOff = "FDR <= 0.01 & Log2FC >= 1.25") 
-#markerList$C6 #change cluster here
-
-# gsub(" ", "-",paste(plot_type, cell_type))
 
 i <- 1
+top <- 20
 for (cluster in 1:length(markerList@listData)) {
-    if (nrow(markerList@listData[[cluster]]["name"]) >= 20) {
+    if (nrow(markerList@listData[[cluster]]["name"]) >= top) {
         if (i == 1) {
-            my_row <- head(markerList@listData[[cluster]]["name"],20)
-            df_top_20 <- as.data.frame(my_row)
-            colnames(df_top_20)[1] <- gsub(" ", "",paste("C", cluster))
+            my_row <- head(markerList@listData[[cluster]]["name"],top)
+            df_top <- as.data.frame(my_row)
+            colnames(df_top)[1] <- gsub(" ", "",paste("Cluster", cluster))
         } else {
-        df_top_20 <- cbind(df_top_20, head(markerList@listData[[cluster]]["name"],20))
-        colnames(df_top_20)[i] <- gsub(" ", "",paste("C", cluster))
+        df_top <- cbind(df_top, head(markerList@listData[[cluster]]["name"],top))
+        colnames(df_top)[i] <- gsub(" ", "",paste("Cluster", cluster))
         }
     } else {
         next
@@ -1035,18 +963,77 @@ for (cluster in 1:length(markerList@listData)) {
 }
 rm(cluster, i)
 
-## ROWNAMEEEEEES
-for (row in 1:20) {
+# ROWNAMES
+row_list <- c()
+for (row in 1:top) {
     row_list <- append(row_list, gsub(" ", "",paste("MarkerGene", row)))
 }
 
-rownames(df_top_20) <- row_list
-df_top_20
+rownames(df_top) <- row_list
+df_top
+rm(row, row_list, top)
+```
+
+### DF top3 --> create list of markers to pass through next function
+```{r}
+#| message: false
+#| warning: false
+
+# list of marker genes per cluster (ranked in comparison to the markers from the other markers)
+markerList <- getMarkers(se, cutOff = "FDR <= 0.01 & Log2FC >= 1.25") 
+
+i <- 1
+top <- 3
+for (cluster in 1:length(markerList@listData)) {
+    if (nrow(markerList@listData[[cluster]]["name"]) >= top) {
+        if (i == 1) {
+            my_row <- head(markerList@listData[[cluster]]["name"],top)
+            df_top3 <- as.data.frame(my_row)
+            colnames(df_top3)[1] <- gsub(" ", "",paste("Cluster", cluster))
+        } else {
+        df_top3 <- cbind(df_top3, head(markerList@listData[[cluster]]["name"],top))
+        colnames(df_top3)[i] <- gsub(" ", "",paste("Cluster", cluster))
+        }
+    } else {
+        next
+    }
+    i <- i + 1
+}
+rm(cluster, i)
+
+# ROWNAMES
+row_list <- c()
+for (row in 1:top) {
+    row_list <- append(row_list, gsub(" ", "",paste("MarkerGene", row)))
+}
+rownames(df_top3) <- row_list
+df_top3
+
+
+# take every element of the small list and create 1 list
+list_top3_df <- as.list(df_top3)
+list_top3 <- c()
+
+for (c in 1:length(list_top3_marker_gene)) {
+    for (i in 1:top) {
+        list_top3 <- append(list_top3, list_top3_marker_gene[[c]][i])
+    }
+}
+list_top3
+
+# remove variable
+rm(row, row_list, top, list_top3_df, c, i)
+```
+
+Save dataframe as csv
+```{r}
+# Export dataframe as csv (for report)
+write.csv(t(df_top3), "/Users/raphaelmauron/masters_project/doc/archr_multi/df_top3_markergenes.csv", row.names=T)
 ```
 
 
 ### Visualizing Marker Genes on an Embedding
-
+(skip?) --> does not make sense to embed marker genes on ATAC cluster. signal is too low
 ```{r}
 #| message: false
 #| warning: false
@@ -1055,14 +1042,14 @@ df_top_20
 p <- plotEmbedding(
     ArchRProj = projMulti2,
     colorBy = "GeneExpressionMatrix",
-    name = my_markers,
-    embedding = "UMAPHarmony", #can select the dimensionality reduction here
+    name = c(my_markers, list_top3),
+    embedding = "UMAPHarmony_ATAC", #"UMAPHarmony", #can select the dimensionality reduction here
     quantCut = c(0.01, 0.95),
     imputeWeights = NULL
 )
 ```
 
-
+(skip?)
 ```{r}
 #| message: false
 #| warning: false
@@ -1085,7 +1072,7 @@ p <- lapply(p, function(x){
 #do.call(cowplot::plot_grid, c(list(ncol = 1),p))
 ```
 
-
+(skip?)
 ```{r}
 #save plot
 plotPDF(plotList = p, 
@@ -1100,16 +1087,18 @@ rm(p)
 
 ### Marker genes imputation with MAGIC (point 7.5 in manual)
 
+(skip?)
 ```{r}
 #| message: false
 #| warning: false
 #| output: false
 
 projMulti2 <- addImputeWeights(ArchRProj = projMulti2,
-                               reducedDims = "LSI_Combined")
+                               reducedDims = "LSI_ATAC" #"LSI_Combined"
+                               )
 ```
 
-
+(skip?)
 ```{r}
 #| message: false
 #| warning: false
@@ -1118,13 +1107,13 @@ projMulti2 <- addImputeWeights(ArchRProj = projMulti2,
 p <- plotEmbedding(
     ArchRProj = projMulti2, 
     colorBy = "GeneExpressionMatrix", 
-    name = my_markers, 
-    embedding = "UMAPHarmony", #can select the dimensionality reduction here
+    name = c(my_markers, list_top3), 
+    embedding = "UMAPHarmony_ATAC", #"UMAPHarmony", #can select the dimensionality reduction here
     imputeWeights = getImputeWeights(projMulti2)
 )
 ```
 
-
+(skip?)
 ```{r}
 #| message: false
 #| warning: false
@@ -1147,7 +1136,7 @@ p <- lapply(p, function(x){
 #do.call(cowplot::plot_grid, c(list(ncol = 3),p))
 ```
 
-
+(skip?) --> At least now there is a strong enough signal
 ```{r}
 #| message: false
 #| warning: false
@@ -1165,6 +1154,7 @@ rm(p)
 
 
 ### Track Plotting (point 7.6 in manual)
+!!! browse the local chromatin accessibility at these marker genes on a per cluster basis !!!
 
 ```{r}
 #| message: false
@@ -1173,11 +1163,11 @@ rm(p)
 #| include: false #prevent to overload the session but this chunk won't be visible if you render
 
 p <- plotBrowserTrack(
-    ArchRProj = projMulti2, 
-    groupBy = "Clusters_Combined", 
-    geneSymbol = my_markers, 
-    upstream = 50000,
-    downstream = 50000
+     ArchRProj = projMulti2, 
+     groupBy = "Clusters_ATAC", #Clusters_Combined", 
+     geneSymbol = c(my_markers, list_top3), 
+     upstream = 50000,
+     downstream = 50000
 )
 ```
 
@@ -1271,7 +1261,7 @@ p1 <- plotEmbedding(
     projMulti3,
     colorBy = "cellColData",
     name = "predictedGroup_Un_1",
-    embedding = "UMAP_Combined",
+    embedding = "UMAPHarmony",
     pal = paletteDiscrete(values = unique(projMulti3@cellColData@listData[["predictedGroup_Un_1"]]))
 )
 
@@ -1279,7 +1269,7 @@ p1_1 <- plotEmbedding(
     projMulti3,
     colorBy = "cellColData",
     name = "predictedGroup_Un_1",
-    embedding = "UMAPHarmony",
+    embedding = "UMAPHarmony_ATAC",
     pal = paletteDiscrete(values = unique(projMulti3@cellColData@listData[["predictedGroup_Un_1"]]), set = "stallion2")
 )
 
@@ -1315,7 +1305,16 @@ p2 <- plotEmbedding(
     pal = paletteDiscrete(values = unique(projMulti3@cellColData@listData[["predictedGroup_Un_2"]]))
 )
 
-#p2
+p2_1 <- plotEmbedding(
+    projMulti3,
+    colorBy = "cellColData",
+    name = "predictedGroup_Un_2",
+    embedding = "UMAPHarmony_ATAC",
+    pal = paletteDiscrete(values = unique(projMulti3@cellColData@listData[["predictedGroup_Un_2"]]))
+)
+
+p2
+p2_1
 ```
 
 
