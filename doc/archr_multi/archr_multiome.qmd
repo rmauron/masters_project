@@ -1372,8 +1372,8 @@ p4_1 <- plotEmbedding(
 
 )
 
-#p4
-#p4_1
+p4
+p4_1
 ```
 
 
@@ -1387,9 +1387,9 @@ projMulti3 <- addGeneIntegrationMatrix(
     ArchRProj = projMulti2, 
     useMatrix = "GeneExpressionMatrix",
     matrixName = "GeneIntegrationMatrix_db_3",
-    reducedDims = "Harmony", #"LSI_Combined"
+    reducedDims = "Harmony_ATAC", #"LSI_Combined"
     seRNA = se_RNA_mousebrain_data,
-    addToArrow = FALSE,
+    addToArrow = TRUE,
     force = TRUE, #to allow rerun
     groupRNA = "TaxonomyRank3",
     nameCell = "predictedCell_Un_3",
@@ -1429,19 +1429,90 @@ rm(p1, p1_1, p2, p2_1, p3, p3_1, p4, p4_1)
 ```
 
 
+### Rename clusters
+
+```{r}
+#confusion matrix between our scATAC-seq clusters and the predictedGroup
+# cM <- confusionMatrix(projMulti3$Clusters_ATAC, projMulti3$predictedGroup_Un_4)
+# labelOld <- rownames(cM)
+# labelOld
+```
+
+```{r}
+#identify the cell type from predictedGroup which best defines that cluster
+# labelNew <- colnames(cM)[apply(cM, 1, which.max)]
+# labelNew
+```
+
+```{r}
+#rename the clusters from taxonomy level 4 with the celltypes printed above
+# remapClust <- c(
+#     "Astrocytes" = "Astrocytes",
+#     "Cholinergic and monoaminergic neurons" = "Cholinergic and monoaminergic neurons",
+#     "Choroid epithelial cells" = "Immature neural",
+#     "Dentate gyrus granule neurons" = "Neurons",
+#     "Dentate gyrus radial glia−like cells" = "Radial glia−like cells",
+#     "Di− and mesencephalon excitatory neurons" = "Di- and mesencephalon neurons",
+#     "Di− and mesencephalon inhibitory neurons" = "Di- and mesencephalon neurons",
+#     "Ependymal cells" = "Astrocytes",
+#     "Glutamatergic neuroblasts" = "Immature neural",
+#     "Microglia" = "Microglia",
+#     "Non−glutamatergic neuroblasts" = "Immature neural",
+#     "Oligodendrocyte precursor cells" = "Oligodendrocyte precursor cells"            ,
+#     "Oligodendrocytes" = "Oligodendrocytes",
+#     "Peptidergic neurons" = "Neurons",
+#     "Perivascular macrophages" = "Microglia",
+#     "Subventricular zone radial glia−like cells" = "Radial glia−like cells",
+#     "Telencephalon inhibitory interneurons" = "Telencephalon interneurons",
+#     "Telencephalon projecting excitatory neurons" = "Telencephalon projecting neurons",
+#     "Telencephalon projecting inhibitory neurons" = "Telencephalon projecting neurons",
+#     "Vascular and leptomeningeal cells" = "Vascular cells",
+#     "Vascular smooth muscle cells" = "Vascular cells"
+# )
+# 
+# remapClust <- remapClust[names(remapClust) %in% labelNew]
+```
+
+```{r}
+# labelNew2 <- mapLabels(labelNew, oldLabels = names(remapClust), newLabels = remapClust)
+# labelNew2
+```
+
+```{r}
+#can use the mapLabels() function again to create new cluster labels in cellColData
+# projMulti3$Clusters_ATAC_2 <- mapLabels(projMulti3$Clusters_ATAC, newLabels = labelNew2, oldLabels = labelOld)
+```
+
+```{r}
+# p1 <- plotEmbedding(projMulti3, colorBy = "cellColData", name = "Clusters_ATAC_2", embedding = "UMAPHarmony_ATAC")
+# p1
+```
+
+```{r}
+#save plot
+# plotPDF(p1, 
+#         name = "Annotated_UMAP_HarmonyATAC.pdf", 
+#         ArchRProj = projMulti3,
+#         addDOC = FALSE)
+#rm(p1)
+```
+
+
+### Group by condition and by sample
+
 ```{r}
 #new category which specifies the condition and the cell type
 # Condition_CellType
 projMulti3 <- addCellColData(
     ArchRProj = projMulti3, 
-    data = gsub(" ", "_", paste0(projMulti3@cellColData$Conditions, "_x_", projMulti3@cellColData$predictedGroup_Un_4)), 
-    name = "Condition_CellType", 
+    data = gsub(" ", "_", paste0(projMulti3@cellColData@listData[["predictedGroup_Un_3"]], "_x_", projMulti3@cellColData$Sample)), 
+    name = "CellType_Sample", 
     cells = getCellNames(projMulti3), 
     force = TRUE)
 
 projMulti3 <- addCellColData(
     ArchRProj = projMulti3, 
-    data = gsub(" ", "_", paste0(projMulti3@cellColData$predictedGroup_Un_4, "_x_", projMulti3@cellColData$Conditions)), 
+    data = gsub(" ", "_", paste0(projMulti3@cellColData@listData[["predictedGroup_Un_3"]], "_x_", projMulti3@cellColData$Conditions)), 
     name = "CellType_Condition", 
     cells = getCellNames(projMulti3), 
     force = TRUE)
@@ -1450,11 +1521,17 @@ projMulti3 <- addCellColData(
 unique(projMulti3@cellColData@listData[["CellType_Condition"]])
 ```
 
+
 ```{r}
 df_cond_cell <- as.data.frame(table(projMulti3@cellColData@listData[["CellType_Condition"]]))
-df_cond_cell <- cbind(df_cond_cell, projMulti3@cellColData@listData[["Sample"]]) #new
-df_cond_cell <- setnames(df_cond_cell, c("CellType_Condition", "nCells", "Sample")) #new
-df_cond_cell <- df_cond_cell %>% add_column(Conditions = c("CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG", "CF", "CG"))
+df_cond_cell <- setnames(df_cond_cell, c("CellType_Condition", "nCells"))
+df_cond_cell$CellType_Condition <- as.character(df_cond_cell$CellType_Condition)  
+
+df_cond_cell <- df_cond_cell %>%
+    mutate(Conditions = case_when(
+        endsWith(CellType_Condition, "CF") ~ "CF",
+        endsWith(CellType_Condition, "CG") ~ "CG"))
+
 df_cond_cell
 ```
 
@@ -1462,24 +1539,73 @@ df_cond_cell
 p_cond <- ggplot(df_cond_cell,                                 
        aes(x = CellType_Condition,
            y = nCells,
-           fill = Sample)) + #new
+           fill = Conditions)) + #new Sample
   geom_bar(stat = "identity")+
   ggtitle("Number of cells per condition") +
-    theme(axis.text.x = element_text(angle = 60, hjust=1))
+    theme(axis.text.x = element_text(angle = 60, hjust=1))+
+    theme(legend.position="bottom")
 
-p_cond + coord_fixed(ratio = 0.3) #new
+p_cond #+ coord_fixed(ratio = 0.3) #new
+```
+
+
+```{r}
+df <- as.data.frame(table(projMulti3@cellColData@listData[["CellType_Sample"]]))
+df <- setnames(df, c("CellType_Sample", "nCells"))
+df$CellType_Sample <- as.character(df$CellType_Sample)  
+
+sample_list <- c()
+for (sample in df$CellType_Sample) {
+    sample_list <- append(sample_list, sub("[0-9].*", "", sample))
+}
+
+df <- df %>% add_column(Samples = sample_list)
+
+df <- df %>%
+    mutate(Condition = case_when(
+        endsWith(CellType_Sample, "CF1") ~ "CF1",
+        endsWith(CellType_Sample, "CF2") ~ "CF2",
+        endsWith(CellType_Sample, "CF7") ~ "CF7",
+        endsWith(CellType_Sample, "CG8") ~ "CG8",
+        endsWith(CellType_Sample, "CG9") ~ "CG9"
+    ))
+
+df
+```
+
+```{r}
+p_sample <- ggplot(df,                                 
+       aes(x = Samples,
+           y = nCells,
+           fill = Condition)) + #new Sample
+  geom_bar(postition = "stack", stat = "identity")+
+  ggtitle("Number of cells per condition and per sample") +
+    theme(axis.text.x = element_text(angle = 60, hjust=1)) +
+    theme(legend.position="bottom") +
+    scale_fill_viridis_d()
+
+
+p_sample #+ coord_fixed(ratio = 0.001) #new
+```
+
+
+```{r}
+p_comb <- ggarrange(p_cond, p_sample, ncol = 2,nrow = 1) #labels = c("A", "B"))
+        # Label of the line plot
+   
+p_comb
 ```
 
 
 ```{r}
 #save plot
-plotPDF(p_cond, 
+plotPDF(p_cond, p_sample, p_comb, 
         name = "Plot-nCells_Condition_CellType.pdf", 
         ArchRProj = projMulti3,
         addDOC = FALSE,
-        width = 20,
+        width = 25,
         height = 10)
-rm(p_cond)
+#rm(p_cond)
 ```
 
 
