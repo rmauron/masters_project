@@ -32,6 +32,7 @@ loading ArchR, setting up our genome (`hg38`, `mm10`, ...), threads (which are s
 
 library(ArchR)
 library(tidyverse)
+library(ggpubr)
 
 #addArchRGenome("hg38") #for human
 addArchRGenome("mm10") #for mouse
@@ -350,8 +351,6 @@ condition_after_filter <- table(projMulti2@cellColData$Sample)
 condition_after_filter <- as.data.frame(condition_after_filter)
 condition_after_filter <- cbind(condition_after_filter, after_filter = c("after", "after", "after", "after", "after"))
 condition_after_filter <- setnames(condition_after_filter, c("Sample", "nCells", "filter"))
-#condition_after_filter
-#condition_sample
 
 filter_diff <- condition_sample[,"nCells"] - condition_after_filter[,"nCells"]
 filter_df <- as.data.frame(cbind(Sample = c("CF1", "CF2", "CF7", "CG8", "CG9"),
@@ -369,7 +368,7 @@ p_before_after <- ggplot(super_frame,
     geom_bar(position = "dodge", stat="identity", width=1) +
     ggtitle("Sample before-after Quality Control") +
     theme(legend.position="bottom")
-    #theme_ipsum()
+    theme_ipsum()
 
 p_before_after
 
@@ -1410,22 +1409,29 @@ p3_1 <- plotEmbedding(
     colorBy = "cellColData",
     name = "predictedGroup_Un_3",
     embedding = "UMAPHarmony_ATAC",
-    pal = paletteDiscrete(values = unique(projMulti3@cellColData@listData[["predictedGroup_Un_3"]]))
-)
+    pal = paletteDiscrete(values = unique(projMulti3@cellColData@listData[["predictedGroup_Un_3"]])),
+    #legendSize = 50,
+    labelSize = 5,
+    colorTitle = ""
 
-#p3
+) +
+    theme(legend.text = element_text(size = 14)) +
+    guides(color = guide_legend(ncol = 2, override.aes = list(size = 4)) )
+    
+p3_1
+ggsave("tax3.png", path = "./Save-ProjMulti3/Plots", width = 10, height = 12)
 ```
 
 
 ```{r}
 #save plot
 plotPDF(p1, p1_1, p2, p2_1, p3, p3_1, p4, p4_1, 
-        name = "Plot-HarmonyUMAP-Cell-Annotation.pdf", 
+        name = "Plot-HarmonyUMAP-Cell-Annotation3.pdf", 
         ArchRProj = projMulti3,
         addDOC = FALSE,
         width = 5,
         height = 5)
-rm(p1, p1_1, p2, p2_1, p3, p3_1, p4, p4_1)
+#rm(p1, p1_1, p2, p2_1, p3, p3_1, p4, p4_1)
 ```
 
 
@@ -1609,6 +1615,13 @@ plotPDF(p_cond, p_sample, p_comb,
 ```
 
 
+#### Clusters metrics
+
+```{r}
+#here want to perform metrics of each clusters 
+```
+
+
 ```{r}
 #| warning: false
 #| message: false
@@ -1635,13 +1648,13 @@ projMulti4 <- projMulti3
 #add coverage (point 9 in manual)
 projMulti4 <- addGroupCoverages(
     ArchRProj = projMulti4, 
-    groupBy = "Clusters_Combined" #in CellColData, 
+    groupBy = "Clusters_ATAC" #in CellColData, 
     )
 
 #get path to the python tool installed through miniconda (MACS2)
 projMulti4 <- addReproduciblePeakSet(
     ArchRProj = projMulti4, 
-    groupBy = "Clusters_Combined", #in CellColData, 
+    groupBy = "Clusters_ATAC", #in CellColData, 
     pathToMacs2 = "/usr/local/bin/macs2"#"/Users/raphaelmauron/Library/Python/3.9/bin/macs2"
         )
 
@@ -1673,54 +1686,86 @@ getAvailableMatrices(projMulti4)
 ```{r}
 #Our scRNA labels to remind ourselves of the cell types that we are working with in projMulti4
 table(projMulti4@cellColData@listData[["CellType_Condition"]])
+
+useGroups_list <- grep("CF", sort(unique(projMulti4@cellColData@listData[["CellType_Condition"]])), value = T)
+bgdGroups_list <- grep("CG", sort(unique(projMulti4@cellColData@listData[["CellType_Condition"]])), value = T)
+
+i <- 1
+for (i in 1:length(useGroups_list)) {
+    # print(useGroups_list[i])
+    # print(bgdGroups_list[i])
+    
+    nam <- gsub(" ", "", paste0("marker_pairwise", "_", useGroups_list[i]))
+    print(nam)
+    
+    nam_significant <- gsub(" ", "", paste0("marker_pairwise_significant", "_", useGroups_list[i]))
+    print(nam_significant)
+    
+    i <- i+1
+}
 ```
 
 
 ```{r}
-#pairwise testing withing "Cholinergic,_monoaminergic_and_peptidergic_neurons" cluster
-marker_Cholinergic <- getMarkerFeatures(
-  ArchRProj = projMulti4, 
-  useMatrix = "PeakMatrix",
-  groupBy = "CellType_Condition",
-  testMethod = "wilcoxon",
-  bias = c("TSSEnrichment", 
-            "log10(nFrags)", 
-            "log10(Gex_nUMI)"),
-  useGroups = "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CF",
-  bgdGroups = "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CG"
-)
+#pairwise testing for each cluster between conditions
+i <- 1
+for (i in 1:length(useGroups_list)) {
+    print(useGroups_list[i])
+    print(bgdGroups_list[i])
+    
+    nam <- gsub(" ", "", paste0("marker_pairwise", "_", useGroups_list[i])) #marker_pairwise for each iteration with cell names
+    nam <- getMarkerFeatures(
+      ArchRProj = projMulti4, 
+      useMatrix = "PeakMatrix",
+      groupBy = "CellType_Condition",
+      testMethod = "wilcoxon",
+      bias = c("TSSEnrichment", 
+                "log10(nFrags)", 
+                "log10(Gex_nUMI)"),
+      useGroups = useGroups_list[i],
+      bgdGroups = bgdGroups_list[i]
+    )    
+    
+    nam_significant <- gsub(" ", "", paste0("marker_pairwise_significant", "_", useGroups_list[i])) #marker_pairwise_significant for each iteration with cell names
+    marker_significant <- c() #list of dataframes of marker_pairwise_significant
 
+    nam_significant <- as.data.frame(nam@assays@data@listData)
+    nam_significant <- setnames(nam_significant, c("Log2FC", "Mean", "FDR", "Pval", "MeanDiff", "AUC", "MeanBGD"))
+    nam_significant <- nam_significant[((nam_significant$FDR <= 0.5) & (nam_significant$Log2FC >= 1)),] #& (nam_significant$Log2FC >= 1 | nam_significant$Log2FC <= 1 )),]
+    nam_significant <- nam_significant[((nam_significant$Log2FC >= 1)),]
+    nam_significant <- nam_significant %>% drop_na()
+    
+    ######## redo list of DF
+    marker_significant <- append(nam_significant, list(marker_significant), 0) # append every dataframe to this list
+    
+    i <- i+1
+}
 
-marker_Cholinergic_significant <- as.data.frame(marker_Cholinergic@assays@data@listData)
-marker_Cholinergic_significant <- setnames(marker_Cholinergic_significant, c("Log2FC", "Mean", "FDR", "Pval", "MeanDiff", "AUC", "MeanBGD"))
-marker_Cholinergic_significant <- marker_Cholinergic_significant[
-    ((marker_Cholinergic_significant$FDR <= 0.5) & (marker_Cholinergic_significant$Log2FC >= 1)),] #& (marker_Cholinergic_significant$Log2FC >= 1 | marker_Cholinergic_significant$Log2FC <= 1 )),]
-marker_Cholinergic_significant <- marker_Cholinergic_significant[
-    ((marker_Cholinergic_significant$Log2FC >= 1)),]
-marker_Cholinergic_significant <- marker_Cholinergic_significant %>% drop_na()
 ```
 
 
 ```{r}
-
-#pairwise testing withing "Cholinergic,_monoaminergic_and_peptidergic_neurons" cluster
-marker_Oligodendrocytes <- getMarkerFeatures(
-  ArchRProj = projMulti4, 
-  useMatrix = "PeakMatrix",
-  groupBy = "CellType_Condition",
-  testMethod = "wilcoxon",
-  bias = c("TSSEnrichment", 
-            "log10(nFrags)", 
-            "log10(Gex_nUMI)"),
-  useGroups = "Oligodendrocytes_x_CF",
-  bgdGroups = "Oligodendrocytes_x_CG"
-)
-
-marker_Oligodendrocytes_significant <- as.data.frame(marker_Oligodendrocytes@assays@data@listData)
-marker_Oligodendrocytes_significant <- setnames(marker_Oligodendrocytes_significant, c("Log2FC", "Mean", "FDR", "Pval", "MeanDiff", "AUC", "MeanBGD"))
-marker_Oligodendrocytes_significant <- marker_Oligodendrocytes_significant[
-    ((marker_Oligodendrocytes_significant$FDR <= 0.1) & (marker_Oligodendrocytes_significant$Log2FC >= 1 | marker_Oligodendrocytes_significant$Log2FC <= 1 )),]
-marker_Oligodendrocytes_significant <- marker_Oligodendrocytes_significant %>% drop_na()
+# #pairwise testing withing "Cholinergic,_monoaminergic_and_peptidergic_neurons" cluster
+# marker_Cholinergic <- getMarkerFeatures(
+#   ArchRProj = projMulti4, 
+#   useMatrix = "PeakMatrix",
+#   groupBy = "CellType_Condition",
+#   testMethod = "wilcoxon",
+#   bias = c("TSSEnrichment", 
+#             "log10(nFrags)", 
+#             "log10(Gex_nUMI)"),
+#   useGroups = "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CF",
+#   bgdGroups = "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CG"
+# )
+# 
+# 
+# marker_Cholinergic_significant <- as.data.frame(marker_Cholinergic@assays@data@listData)
+# marker_Cholinergic_significant <- setnames(marker_Cholinergic_significant, c("Log2FC", "Mean", "FDR", "Pval", "MeanDiff", "AUC", "MeanBGD"))
+# marker_Cholinergic_significant <- marker_Cholinergic_significant[
+#     ((marker_Cholinergic_significant$FDR <= 0.5) & (marker_Cholinergic_significant$Log2FC >= 1)),] #& (marker_Cholinergic_significant$Log2FC >= 1 | marker_Cholinergic_significant$Log2FC <= 1 )),]
+# marker_Cholinergic_significant <- marker_Cholinergic_significant[
+#     ((marker_Cholinergic_significant$Log2FC >= 1)),]
+# marker_Cholinergic_significant <- marker_Cholinergic_significant %>% drop_na()
 ```
 
 
@@ -1747,14 +1792,9 @@ markersPeaks <- getMarkerFeatures(
 ```{r}
 #use the getMarkers() function to retrieve particular slices of this SummarizedExperiment that we are interested in
 #return a list of DataFrame objects, one for each cell group
-markerList <- getMarkers(markersPeaks, cutOff = "FDR <= 0.01 & Log2FC >= 1")
+markerList <- getMarkers(markersPeaks, 
+                         cutOff = "FDR <= 0.01 & Log2FC >= 1")
 markerList
-```
-
-
-```{r}
-#marker peaks for a specific cell group
-markerList$Oligodendrocytes #change cell type
 ```
 
 
@@ -1768,21 +1808,12 @@ markerList
 
 
 ```{r}
-#markerList$Oligodendrocytes #change cell type
-```
-
-```{r}
 #return a GRangesList instead of a DataFrame object.
 markerList_Cholinergic <- getMarkers(marker_Cholinergic, 
                          cutOff = "FDR <= 0.01 & Log2FC >= 1", 
                          returnGR = TRUE)
 markerList_Cholinergic
 
-
-markerList_Oligodendrocytes <- getMarkers(marker_Oligodendrocytes, 
-                         cutOff = "FDR <= 0.01 & Log2FC >= 1", 
-                         returnGR = TRUE)
-markerList_Oligodendrocytes
 ```
 
 
@@ -3498,6 +3529,10 @@ Lastly, we will save this project for future reference.
 
 ```{r}
 projMulti4 <- saveArchRProject(ArchRProj = projMulti4, outputDirectory = "Save-ProjMulti4", overwrite = TRUE, load = TRUE)
+```
+
+```{r}
+sessionInfo()
 ```
 
 
