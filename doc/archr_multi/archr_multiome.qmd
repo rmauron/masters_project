@@ -1684,7 +1684,9 @@ getAvailableMatrices(projMulti4)
 
 ## Identifying Marker Peaks (point 11 in manual)
 
-### Marker Peaks
+### Pairwise Testing Between Groups
+
+!!! ArchR also enables standard differential testing using the same getMarkerFeatures() function. The trick is to set useGroups to one of the two cell groups and bgdGroups to the other cell group.
 
 ```{r}
 #Our scRNA labels to remind ourselves of the cell types that we are working with in projMulti4
@@ -1764,6 +1766,8 @@ for (i in seq_along(markerTest)) {
 ```
 
 
+# to be removed
+
 ```{r}
 #plot Volcano of difference between the 2 conditions
 
@@ -1802,6 +1806,7 @@ for (i in seq_along(markerTest)) {
 ```
 
 
+# to be removed since we are not interested in the difference between clusters.
 
 ```{r}
 #| message: false
@@ -1854,7 +1859,7 @@ markerList_Cholinergic
 
 multiple plotting functions to interact with the SummarizedExperiment objects returned by getMarkerFeatures()
 
-#### Marker Peak Heatmaps
+#### Marker Peak Heatmaps ??? for each cluster??
 
 ```{r}
 #| message: false
@@ -1881,86 +1886,10 @@ rm(heatmapPeaks)
 ```
 
 
-### MA and Volcano Plots
 
-We can plot MA or Volcano plot for any individual cell group.
-Here, only VolcanoPlots
-
-#### Volcano plot
-
-```{r}
-#| message: false
-#| warning: false
-#| output: false
-
-#Volcano plot
-cell_types <- sort(unique(projMulti4@cellColData@listData[["predictedGroup_Un_3"]]))
-
-for (marker in seq_along(markerTest)) {
-pv <- plotMarkers(
-    seMarker = marker, #iterate in markerTest
-    name = colnames, #change cell name
-    cutOff = "FDR <= 0.1 & Log2FC >= 1",
-    plotAs = "Volcano" #MA
-    ) + ggtitle(cell_types[marker])
-
-print(pv)
-plot_type <- "volcano-markers"
-cell_type <- marker
-
-plotPDF(pv, name = gsub(" ", "-",paste(plot_type, cell_type)), width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
-}
-#rm(plot_type, cell_type)
-```
-
-
-```{r}
-pv <- plotMarkers(
-    seMarker = marker_Cholinergic,
-    name = "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CF", #change cell name
-    cutOff = "FDR <= 0.1 & (Log2FC >= 1 | Log2FC <= 1)",
-    plotAs = "Volcano" #MA
-    ) +
-    ggtitle("Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CF") +
-    ylab("-log10(FDR)") +
-    xlab("Log2 Fold Change")
-print(pv)
-
-
-pv <- plotMarkers(
-    seMarker = marker_Oligodendrocytes,
-    name = "Oligodendrocytes_x_CF", #change cell name
-    cutOff = "(FDR <= 0.1) & (Log2FC >= 1 | Log2FC <= 1)",
-    plotAs = "Volcano" #MA
-    ) + ggtitle("Oligodendrocytes_x_CF")
-print(pv)
-```
-
-### Pairwise Testing Between Groups
-
-!!! ArchR also enables standard differential testing using the same getMarkerFeatures() function. The trick is to set useGroups to one of the two cell groups and bgdGroups to the other cell group.
-
-```{r}
-#| message: false
-#| warning: false
-#| output: false
-
-# # group 1: useGroups
-# # group 2: bgdGroups
-# markerTest <- getMarkerFeatures( ### markerTest is also used in other downstream analysis
-#   ArchRProj = projMulti4, 
-#   useMatrix = "PeakMatrix",
-#   groupBy = "predictedGroup_Un_3",
-#   testMethod = "wilcoxon",
-#   bias = c("TSSEnrichment", 
-#              "log10(nFrags)", 
-#              "log10(Gex_nUMI)"),
-#   useGroups = "Oligodendrocytes", #cell type 1
-#   bgdGroups = "Immature neural" #cell type 2
-# )
-```
 
 ### markerConditions
+Can retrieve the most significant markers between CF and CG !!!
 
 ```{r}
 #| message: false
@@ -1983,6 +1912,7 @@ markersPeaksCondition <- getMarkerFeatures(
     bgdGroups = "CG" #cell type 2
 )
 ```
+
 
 ```{r}
 #plot Volcano
