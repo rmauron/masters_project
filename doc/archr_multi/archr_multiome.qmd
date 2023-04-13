@@ -39,7 +39,10 @@ addArchRGenome("mm10") #for mouse
 library(BSgenome.Mmusculus.UCSC.mm10)
 addArchRThreads(32) #rocommended 1/2 of total available cores
 set.seed(1)
-#projMulti1 <- loadArchRProject(path = "./Save-ProjMulti1", force = FALSE, showLogo = F)
+# projMulti1 <- loadArchRProject(path = "./Save-ProjMulti1", force = FALSE, showLogo = F)
+# projMulti2 <- loadArchRProject(path = "./Save-ProjMulti2", force = FALSE, showLogo = F)
+# projMulti3 <- loadArchRProject(path = "./Save-ProjMulti3", force = FALSE, showLogo = F)
+# projMulti4 <- loadArchRProject(path = "./Save-ProjMulti4", force = FALSE, showLogo = F)
 ```
 
 
@@ -1686,34 +1689,34 @@ getAvailableMatrices(projMulti4)
 ```{r}
 #Our scRNA labels to remind ourselves of the cell types that we are working with in projMulti4
 table(projMulti4@cellColData@listData[["CellType_Condition"]])
-
-useGroups_list <- grep("CF", sort(unique(projMulti4@cellColData@listData[["CellType_Condition"]])), value = T)
-bgdGroups_list <- grep("CG", sort(unique(projMulti4@cellColData@listData[["CellType_Condition"]])), value = T)
-
-i <- 1
-for (i in 1:length(useGroups_list)) {
-    # print(useGroups_list[i])
-    # print(bgdGroups_list[i])
-    
-    nam <- gsub(" ", "", paste0("marker_pairwise", "_", useGroups_list[i]))
-    print(nam)
-    
-    nam_significant <- gsub(" ", "", paste0("marker_pairwise_significant", "_", useGroups_list[i]))
-    print(nam_significant)
-    
-    i <- i+1
-}
 ```
 
 
 ```{r}
+# Create list used for 2 parameters needed below. 
+useGroups_list <- grep("CF", sort(unique(projMulti4@cellColData@listData[["CellType_Condition"]])), value = T)
+bgdGroups_list <- grep("CG", sort(unique(projMulti4@cellColData@listData[["CellType_Condition"]])), value = T)
+```
+
+
+Below, marker peaks for each cluster between Flight and Ground are assessed and stored in list of dataframes.
+Those list of dataframes are needed later for the volcano plots or motif enrichment.
+
+```{r}
 #pairwise testing for each cluster between conditions
+
 i <- 1
+marker_significant <- list() #list of dataframes of marker_pairwise_significant
+markerTest <- list() #list of dataframes of marker_pairwise used for Volcano
+
 for (i in 1:length(useGroups_list)) {
+    #print names of group that is running
     print(useGroups_list[i])
     print(bgdGroups_list[i])
     
-    nam <- gsub(" ", "", paste0("marker_pairwise", "_", useGroups_list[i])) #marker_pairwise for each iteration with cell names
+    #marker_pairwise for each iteration with cell names
+    nam <- gsub(" ", "", paste0("marker_pairwise", "_", useGroups_list[i]))
+    #name <- gsub(" ", "", paste0("marker_pairwise", "_", useGroups_list[i]))
     nam <- getMarkerFeatures(
       ArchRProj = projMulti4, 
       useMatrix = "PeakMatrix",
@@ -1724,23 +1727,53 @@ for (i in 1:length(useGroups_list)) {
                 "log10(Gex_nUMI)"),
       useGroups = useGroups_list[i],
       bgdGroups = bgdGroups_list[i]
-    )    
+    )
+    markerTest[[i]] <- nam
     
-    nam_significant <- gsub(" ", "", paste0("marker_pairwise_significant", "_", useGroups_list[i])) #marker_pairwise_significant for each iteration with cell names
-    marker_significant <- c() #list of dataframes of marker_pairwise_significant
+    #plot Volcano for each clusters and save them
+    pv <- plotMarkers(seMarker = nam, 
+                 name = useGroups_list[i], 
+                 cutOff = "FDR <= 0.5 & abs(Log2FC) >= 1",
+                 plotAs = "Volcano")
+    #print(pv) #print the plot
+    plot_type <- "volcano-by-cluster"
+    plotPDF(pv, name = gsub(" ", "-",paste(plot_type, useGroups_list[i])), width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE) #save plot
+    
 
+    #marker_pairwise_significant for each iteration with cell names
+    nam_significant <- gsub(" ", "", paste0("marker_pairwise_significant", "_", useGroups_list[i]))
     nam_significant <- as.data.frame(nam@assays@data@listData)
     nam_significant <- setnames(nam_significant, c("Log2FC", "Mean", "FDR", "Pval", "MeanDiff", "AUC", "MeanBGD"))
     nam_significant <- nam_significant[((nam_significant$FDR <= 0.5) & (nam_significant$Log2FC >= 1)),] #& (nam_significant$Log2FC >= 1 | nam_significant$Log2FC <= 1 )),]
     nam_significant <- nam_significant[((nam_significant$Log2FC >= 1)),]
     nam_significant <- nam_significant %>% drop_na()
-    
-    ######## redo list of DF
-    marker_significant <- append(nam_significant, list(marker_significant), 0) # append every dataframe to this list
+    marker_significant[[i]] <- nam_significant
     
     i <- i+1
 }
+```
 
+
+```{r}
+#rename each dataframe in markerTest and in marker_significant
+#names are found in "colnames"
+for (i in seq_along(markerTest)) {
+  names(markerTest[[i]]) <- useGroups_list[i]
+  names(marker_significant[[i]]) <- useGroups_list[i]
+}
+```
+
+
+```{r}
+#plot Volcano of difference between the 2 conditions
+
+# pv <- plotMarkers(seMarker = markerTest[[1]], 
+#                  name = useGroups_list[i], 
+#                  cutOff = "FDR <= 0.5 & abs(Log2FC) >= 1",
+#                  plotAs = "Volcano")
+# print(pv) #print the plot
+# plot_type <- "volcano-markers"
+# plotPDF(pv, name = gsub(" ", "-",paste(plot_type, useGroups_list[i])), width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE) #save plot
 ```
 
 
@@ -1861,22 +1894,23 @@ Here, only VolcanoPlots
 #| output: false
 
 #Volcano plot
-cell_types <- unique(projMulti4@cellColData@listData[["predictedGroup_Un_3"]])
+cell_types <- sort(unique(projMulti4@cellColData@listData[["predictedGroup_Un_3"]]))
 
-for (cell in cell_types) {
+for (marker in seq_along(markerTest)) {
 pv <- plotMarkers(
-    seMarker = markersPeaks,
-    name = cell,#"Oligodendrocytes", #change cell name
+    seMarker = marker, #iterate in markerTest
+    name = colnames, #change cell name
     cutOff = "FDR <= 0.1 & Log2FC >= 1",
     plotAs = "Volcano" #MA
-    ) + ggtitle(cell)
-#print(pv)
+    ) + ggtitle(cell_types[marker])
+
+print(pv)
 plot_type <- "volcano-markers"
-cell_type <- cell
+cell_type <- marker
 
 plotPDF(pv, name = gsub(" ", "-",paste(plot_type, cell_type)), width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
 }
-rm(plot_type, cell_type)
+#rm(plot_type, cell_type)
 ```
 
 
@@ -3528,7 +3562,11 @@ rm(p)
 Lastly, we will save this project for future reference.
 
 ```{r}
-projMulti4 <- saveArchRProject(ArchRProj = projMulti4, outputDirectory = "Save-ProjMulti4", overwrite = TRUE, load = TRUE)
+#| message: false
+#| warning: false
+#| output: false
+
+saveArchRProject(ArchRProj = projMulti4, outputDirectory = "Save-ProjMulti4", load = F)
 ```
 
 ```{r}
