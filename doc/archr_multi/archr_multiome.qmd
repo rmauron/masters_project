@@ -1732,14 +1732,14 @@ for (i in 1:length(useGroups_list)) {
     )
     markerTest[[i]] <- nam
     
-    # #plot Volcano for each clusters and save them
-    # pv <- plotMarkers(seMarker = nam, 
-    #              name = useGroups_list[i], 
-    #              cutOff = "FDR <= 0.5 & abs(Log2FC) >= 1",
-    #              plotAs = "Volcano")
-    # #print(pv) #print the plot
-    # plot_type <- "volcano-by-cluster"
-    # plotPDF(pv, name = gsub(" ", "-",paste(plot_type, useGroups_list[i])), width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE) #save plot
+    #plot Volcano for each clusters and save them
+    pv <- plotMarkers(seMarker = nam,
+                 name = useGroups_list[i],
+                 cutOff = "FDR <= 0.5 & abs(Log2FC) >= 1",
+                 plotAs = "Volcano")
+    #print(pv) #print the plot
+    plot_type <- "volcano-by-cluster"
+    plotPDF(pv, name = gsub(" ", "-",paste(plot_type, useGroups_list[i])), width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE) #save plot
     
 
     #marker_pairwise_significant for each iteration with cell names
@@ -1919,197 +1919,146 @@ projMulti4 <- addMotifAnnotations(
 We can then use the differential testing SummarizedExperiment object markerTest which was generated in the previous chapter to define the set of significantly differential peaks that we are interested in testing for motif enrichment.
 
 ```{r}
-#| message: false
-#| warning: false
-
-# #based on the markerTest from previous analysis or the entire markerPeaks
-# motifsUp <- peakAnnoEnrichment(
-#     seMarker = markersPeaks, #markerTest,
-#     ArchRProj = projMulti4,
-#     peakAnnotation = "Motif",
-#     cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
-#   )
-# 
-# #motifs enrichment from differential testing among conditions
-# motifsUpCondition <- peakAnnoEnrichment(
-#     seMarker = markersPeaksCondition, #markerTest,
-#     ArchRProj = projMulti4,
-#     peakAnnotation = "Motif",
-#     cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
-#   )
-
-################## need to iterate through thissssss
-motifsUp_Cholinergic <- peakAnnoEnrichment(
-    seMarker = markerTest,
-    ArchRProj = projMulti4,
-    peakAnnotation = "Motif",
-    cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
-  )
-
-# motifsUp_Oligodendrocytes <- peakAnnoEnrichment(
-#     seMarker = marker_Oligodendrocytes, #markerTest,
-#     ArchRProj = projMulti4,
-#     peakAnnotation = "Motif",
-#     cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
-#   )
-
-#based on the markerTest from previous analysis or the entire markerPeaks
-motifsDown <- peakAnnoEnrichment(
-    seMarker = markerTest, #markerTest,
-    ArchRProj = projMulti4,
-    peakAnnotation = "Motif",
-    cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
-  )
-
-# #motifs enrichment from differential testing among conditions
-# motifsDownCondition <- peakAnnoEnrichment(
-#     seMarker = markersPeaksCondition, #markerTest,
-#     ArchRProj = projMulti4,
-#     peakAnnotation = "Motif",
-#     cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
-#   )
-# 
-# motifsDown_Cholinergic <- peakAnnoEnrichment(
-#     seMarker = marker_Cholinergic, #markerTest,
-#     ArchRProj = projMulti4,
-#     peakAnnotation = "Motif",
-#     cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
-#   )
-# 
-# motifsDown_Oligodendrocytes <- peakAnnoEnrichment(
-#     seMarker = marker_Oligodendrocytes, #markerTest,
-#     ArchRProj = projMulti4,
-#     peakAnnotation = "Motif",
-#     cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
-#   )
-```
-
-### Motifs up among every cells
-#### CF
-```{r}
-#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
-df_CF <- data.frame(TF = rownames(motifsUp), mlog10Padj = assay(motifsUp)[,1])
-df_CF <- df_CF[order(df_CF$mlog10Padj, decreasing = TRUE),]
-df_CF$rank <- seq_len(nrow(df_CF))
-```
-
-```{r}
-#to test the most enriched motifs in the peaks 
-head(df_CF)
-```
-
-#### CG
-```{r}
-#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
-df_CG <- data.frame(TF = rownames(motifsDown), mlog10Padj = assay(motifsDown)[,1])
-df_CG <- df_CG[order(df_CG$mlog10Padj, decreasing = TRUE),]
-df_CG$rank <- seq_len(nrow(df_CG))
-```
-
-```{r}
-#to test the most enriched motifs in the peaks 
-head(df_CG)
-```
-
-
-### Motifs up among conditions
-#### CF
-```{r}
-#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
-df_cond_CF <- data.frame(TF = rownames(motifsUpCondition), mlog10Padj = assay(motifsUpCondition)[,1])
-df_cond_CF <- df_cond_CF[order(df_cond_CF$mlog10Padj, decreasing = TRUE),]
-df_cond_CF$rank <- seq_len(nrow(df_cond_CF))
-```
-
-```{r}
-#to test the most enriched motifs in the peaks 
-head(df_cond_CF)
-```
-
-#### CG
-```{r}
-#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
-df_cond_CG <- data.frame(TF = rownames(motifsDownCondition), mlog10Padj = assay(motifsDownCondition)[,1])
-df_cond_CG <- df_cond_CG[order(df_cond_CG$mlog10Padj, decreasing = TRUE),]
-df_cond_CG$rank <- seq_len(nrow(df_cond_CG))
-```
-
-```{r}
-#to test the most enriched motifs in the peaks 
-head(df_cond_CG)
-```
-
-
-### Motifs up in Cholinergic cells
-#### CF
-```{r}
-#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
-df_Cholinergic_CF <- data.frame(TF = rownames(motifsUp_Cholinergic), mlog10Padj = assay(motifsUp_Cholinergic)[,1])
-df_Cholinergic_CF <- df_Cholinergic_CF[order(df_Cholinergic_CF$mlog10Padj, decreasing = TRUE),]
-df_Cholinergic_CF$rank <- seq_len(nrow(df_Cholinergic_CF))
-```
-
-```{r}
-#to test the most enriched motifs in the peaks 
-head(df_Cholinergic_CF)
-```
-
-#### CG
-```{r}
-#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
-df_Cholinergic_CG <- data.frame(TF = rownames(motifsDown_Cholinergic), mlog10Padj = assay(motifsDown_Cholinergic)[,1])
-df_Cholinergic_CG <- df_Cholinergic_CG[order(df_Cholinergic_CG$mlog10Padj, decreasing = TRUE),]
-df_Cholinergic_CG$rank <- seq_len(nrow(df_Cholinergic_CG))
-```
-
-```{r}
-#to test the most enriched motifs in the peaks 
-head(df_Cholinergic_CG)
-```
-
-
-### Motifs up in Oligodendrocytes
-#### CF
-```{r}
-#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
-df_Oligodendrocytes_CF <- data.frame(TF = rownames(motifsUp_Oligodendrocytes), mlog10Padj = assay(motifsUp_Oligodendrocytes)[,1])
-df_Oligodendrocytes_CF <- df_Oligodendrocytes_CF[order(df_Oligodendrocytes_CF$mlog10Padj, decreasing = TRUE),]
-df_Oligodendrocytes_CF$rank <- seq_len(nrow(df_Oligodendrocytes_CF))
-```
-
-```{r}
-#to test the most enriched motifs in the peaks 
-head(df_Oligodendrocytes_CF)
-```
-
-#### CG
-```{r}
-#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
-df_Oligodendrocytes_CG <- data.frame(TF = rownames(motifsDown_Oligodendrocytes), mlog10Padj = assay(motifsDown_Oligodendrocytes)[,1])
-df_Oligodendrocytes_CG <- df_Oligodendrocytes_CG[order(df_Oligodendrocytes_CG$mlog10Padj, decreasing = TRUE),]
-df_Oligodendrocytes_CG$rank <- seq_len(nrow(df_Oligodendrocytes_CG))
-```
-
-```{r}
-#to test the most enriched motifs in the peaks 
-head(df_Oligodendrocytes_CG)
-```
-
-
-
-
-```{r}
 # NOTE: if only very few marker on the graph, run "options(ggrepel.max.overlaps = Inf)" in the console before hand.
 options(ggrepel.max.overlaps = Inf)
 ```
 
+```{r}
+#| message: false
+#| warning: false
+
+motifsUp <- list() #list of motifsUp after iteration in each markerTest
+motifsDo <- list() #list of motifsDo after iteration in each markerTest
+df_motifsUp <- list() #list of dataframe to make the plots
+df_motifsDo <- list() #list of dataframe to make the plots
+
+for (i in seq_along(markerTest)) {
+    ################# UP:
+    ## iterate for the Up-regulated motifs
+    up <- gsub(" ", "", paste0("motifsUp", "_", useGroups_list[i]))
+    up <- peakAnnoEnrichment(
+        seMarker = markerTest[[i]],
+        ArchRProj = projMulti4,
+        peakAnnotation = "Motif",
+        cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
+    )
+    motifsUp[[i]] <- up
+    
+    ## dataframe to be plotted. Also store it in list of dataframe
+    df_Up <- data.frame(TF = rownames(up), mlog10Padj = assay(up)[,1])
+    df_Up <- df_Up[order(df_Up$mlog10Padj, decreasing = TRUE),]
+    df_Up$rank <- seq_len(nrow(df_Up))
+    df_motifsUp[[i]] <- df_Up
+    
+    ## plot
+    ggUp <- ggplot(df_Up, aes(rank, mlog10Padj, color = mlog10Padj)) + 
+      geom_point(size = 1) +
+      ggrepel::geom_label_repel(
+            data = df_Up[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
+            size = 1.5,
+            nudge_x = 2,
+            color = "black"
+      ) + theme_ArchR() + 
+      ylab("-log10(P-adj) Motif Enrichment") + 
+      xlab("Rank Sorted TFs Enriched") +
+      scale_color_gradientn(colors = paletteContinuous(set = "comet"))
+    
+    plot_type <- "Markers-Motifs-Enriched-UP"
+    plotPDF(ggUp, name = gsub(" ", "-",paste(plot_type, useGroups_list[i])), width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE) #save plot
+    
+    
+    ################# DOWN:
+    ## iterate for the Down-regulated motifs
+    down <- gsub(" ", "", paste0("motifsUp", "_", useGroups_list[i]))
+    down <- peakAnnoEnrichment(
+        seMarker = markerTest[[i]],
+        ArchRProj = projMulti4,
+        peakAnnotation = "Motif",
+        cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
+    )
+    motifsDo[[i]] <- down
+    
+    ## dataframe to be plotted. Also store it in list of dataframe
+    df_Do <- data.frame(TF = rownames(down), mlog10Padj = assay(down)[,1])
+    df_Do <- df_Do[order(df_Do$mlog10Padj, decreasing = TRUE),]
+    df_Do$rank <- seq_len(nrow(df_Do))
+    df_motifsDo[[i]] <- df_Do
+    
+    ## plot
+    ggDo <- ggplot(df_Do, aes(rank, mlog10Padj, color = mlog10Padj)) + 
+      geom_point(size = 1) +
+      ggrepel::geom_label_repel(
+            data = df_Do[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
+            size = 1.5,
+            nudge_x = 2,
+            color = "black"
+      ) + theme_ArchR() + 
+      ylab("-log10(P-adj) Motif Enrichment") + 
+      xlab("Rank Sorted TFs Enriched") +
+      scale_color_gradientn(colors = paletteContinuous(set = "comet"))
+    
+    plot_type <- "Markers-Motifs-Enriched-DOWN"
+    plotPDF(ggDo, name = gsub(" ", "-",paste(plot_type, useGroups_list[i])), width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE) #save plot
+    
+}
+
+# #rename each dataframe in motifsUp and motifsDo
+# #names are found in "colnames"
+# for (i in seq_along(motifsUp)) {
+#   names(motifsUp[[i]]) <- useGroups_list[i]
+#   names(motifsDo[[i]]) <- useGroups_list[i]
+# }
+```
+
+
+### MotifsUp and down among all the clusters
+```{r}
+#| message: false
+#| warning: false
+
+#motifs enrichment from differential testing among conditions UP and DOWN
+motifsUpClusters <- peakAnnoEnrichment(
+    seMarker = markersPeaksCondition, #markerTest,
+    ArchRProj = projMulti4,
+    peakAnnotation = "Motif",
+    cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
+  )
+
+motifsDoClusters <- peakAnnoEnrichment(
+    seMarker = markersPeaksCondition, #markerTest,
+    ArchRProj = projMulti4,
+    peakAnnotation = "Motif",
+    cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
+  )
+```
+
+
+### Motifs up/down among every clusters
+```{r}
+#To prepare this data for plotting with ggplot we can create a simplified data.frame object containing the motif names, the corrected p-values, and the significance rank
+df_motifsUpClusters <- data.frame(TF = rownames(motifsUpClusters), mlog10Padj = assay(motifsUpClusters)[,1])
+df_motifsUpClusters <- df_motifsUpClusters[order(df_motifsUpClusters$mlog10Padj, decreasing = TRUE),]
+df_motifsUpClusters$rank <- seq_len(nrow(df_motifsUpClusters))
+
+df_motifsDoClusters <- data.frame(TF = rownames(motifsDoClusters), mlog10Padj = assay(motifsDoClusters)[,1])
+df_motifsDoClusters <- df_motifsDoClusters[order(df_motifsDoClusters$mlog10Padj, decreasing = TRUE),]
+df_motifsDoClusters$rank <- seq_len(nrow(df_motifsDoClusters))
+```
+
+```{r}
+#to test the most enriched motifs in the peaks 
+# head(df_motifsUpClusters)
+# head(df_motifsDoClusters)
+```
+
+
 
 ```{r}
 #Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
-ggUp_CF <- ggplot(df_CF, aes(rank, mlog10Padj, color = mlog10Padj)) + 
+ggUp_CF <- ggplot(df_motifsUpClusters, aes(rank, mlog10Padj, color = mlog10Padj)) + 
   geom_point(size = 1) +
   ggrepel::geom_label_repel(
-        data = df_CF[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
+        data = df_motifsUpClusters[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
         size = 1.5,
         nudge_x = 2,
         color = "black",
@@ -2123,12 +2072,13 @@ ggUp_CF <- ggplot(df_CF, aes(rank, mlog10Padj, color = mlog10Padj)) +
 ggUp_CF
 ```
 
+
 ```{r}
 #Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
-ggUp_CG <- ggplot(df_CG, aes(rank, mlog10Padj, color = mlog10Padj)) + 
+ggDo_CF <- ggplot(df_motifsDoClusters, aes(rank, mlog10Padj, color = mlog10Padj)) + 
   geom_point(size = 1) +
   ggrepel::geom_label_repel(
-        data = df_CG[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
+        data = df_motifsDoClusters[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
         size = 1.5,
         nudge_x = 2,
         color = "black",
@@ -2139,133 +2089,16 @@ ggUp_CG <- ggplot(df_CG, aes(rank, mlog10Padj, color = mlog10Padj)) +
   scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
     ggtitle("Motif enrichment among every cells in CG")
 
-ggUp_CG
+ggDo_CF
 ```
 
-
-```{r}
-#Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
-ggUp_cond_CF <- ggplot(df_cond_CF, aes(rank, mlog10Padj, color = mlog10Padj)) + 
-  geom_point(size = 1) +
-  ggrepel::geom_label_repel(
-        data = df_cond_CF[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
-        size = 1.5,
-        nudge_x = 2,
-        color = "black",
-
-  ) + theme_ArchR() + 
-  ylab("-log10(P-adj) Motif Enrichment") + 
-  xlab("Rank Sorted TFs Enriched") +
-  scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
-    ggtitle("Motif enrichment in CF")
-
-ggUp_cond_CF
-```
-
-
-```{r}
-#Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
-ggUp_cond_CG <- ggplot(df_cond_CG, aes(rank, mlog10Padj, color = mlog10Padj)) + 
-  geom_point(size = 1) +
-  ggrepel::geom_label_repel(
-        data = df_cond_CG[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
-        size = 1.5,
-        nudge_x = 2,
-        color = "black",
-
-  ) + theme_ArchR() + 
-  ylab("-log10(P-adj) Motif Enrichment") + 
-  xlab("Rank Sorted TFs Enriched") +
-  scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
-    ggtitle("Motif enrichment in CG")
-
-ggUp_cond_CG
-```
-
-
-```{r}
-#Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
-ggUp_Cholinergic_CF <- ggplot(df_Cholinergic_CF, aes(rank, mlog10Padj, color = mlog10Padj)) + 
-  geom_point(size = 1) +
-  ggrepel::geom_label_repel(
-        data = df_Cholinergic_CF[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
-        size = 1.5,
-        nudge_x = 2,
-        color = "black",
-
-  ) + theme_ArchR() + 
-  ylab("-log10(P-adj) Motif Enrichment") + 
-  xlab("Rank Sorted TFs Enriched") +
-  scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
-    ggtitle("Motif enrichment in Cholinergic in CF")
-
-ggUp_Cholinergic_CF
-```
-
-
-```{r}
-#Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
-ggUp_Cholinergic_CG <- ggplot(df_Cholinergic_CG, aes(rank, mlog10Padj, color = mlog10Padj)) + 
-  geom_point(size = 1) +
-  ggrepel::geom_label_repel(
-        data = df_Cholinergic_CG[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
-        size = 1.5,
-        nudge_x = 2,
-        color = "black",
-
-  ) + theme_ArchR() + 
-  ylab("-log10(P-adj) Motif Enrichment") + 
-  xlab("Rank Sorted TFs Enriched") +
-  scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
-    ggtitle("Motif enrichment in Cholinergic in CG")
-
-ggUp_Cholinergic_CG
-```
-
-
-```{r}
-#Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
-ggUp_Oligodendrocytes_CF <- ggplot(df_Oligodendrocytes_CF, aes(rank, mlog10Padj, color = mlog10Padj)) + 
-  geom_point(size = 1) +
-  ggrepel::geom_label_repel(
-        data = df_Oligodendrocytes_CF[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
-        size = 1.5,
-        nudge_x = 2,
-        color = "black",
-
-  ) + theme_ArchR() + 
-  ylab("-log10(P-adj) Motif Enrichment") + 
-  xlab("Rank Sorted TFs Enriched") +
-  scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
-    ggtitle("Motif enrichment in Oligodendrocytes in CF")
-
-ggUp_Oligodendrocytes_CF
-```
-
-
-```{r}
-#Using ggplot we can plot the rank-sorted TF motifs and color them by the significance of their enrichment. Here we use ggrepel to label each TF motif.
-ggUp_Oligodendrocytes_CG <- ggplot(df_Oligodendrocytes_CG, aes(rank, mlog10Padj, color = mlog10Padj)) + 
-  geom_point(size = 1) +
-  ggrepel::geom_label_repel(
-        data = df_Oligodendrocytes_CG[rev(seq_len(30)), ], aes(x = rank, y = mlog10Padj, label = TF), 
-        size = 1.5,
-        nudge_x = 2,
-        color = "black",
-
-  ) + theme_ArchR() + 
-  ylab("-log10(P-adj) Motif Enrichment") + 
-  xlab("Rank Sorted TFs Enriched") +
-  scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
-    ggtitle("Motif enrichment in Oligodendrocytes in CG")
-
-ggUp_Oligodendrocytes_CG
-```
 
 ```{r}
 #save plots
-plotPDF(ggUp_CF, ggUp_CG, ggUp_cond_CF, ggUp_cond_CG, ggUp_Cholinergic_CF, ggUp_Cholinergic_CG, ggUp_Oligodendrocytes_CF, ggUp_Oligodendrocytes_CG, name = "Motifs-Enriched-plot", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
-rm(ggUp_CF, ggUp_CG, ggUp_cond_CF, ggUp_cond_CG, ggUp_Cholinergic_CF, ggUp_Cholinergic_CG, ggUp_Oligodendrocytes_CF, ggUp_Oligodendrocytes_CG)
+plotPDF(ggUp_CF, ggDo_CF, 
+        name = "Motifs-Enriched-plot-Condition", 
+        width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+#rm(ggUp_CF, ggDo_CF)
 ```
 
 
@@ -2290,8 +2123,8 @@ enrichMotifs <- peakAnnoEnrichment(
 ```{r}
 #plot motif enrichments across all cell groups
 heatmapEM <- plotEnrichHeatmap(enrichMotifs, 
-                               n = 7, #number of motifs shown per cell group
-                               transpose = TRUE)
+                               n = 10, #number of motifs shown per cell group
+                               transpose = T)
 ```
 
 
@@ -2303,18 +2136,9 @@ heatmapEM <- plotEnrichHeatmap(enrichMotifs,
 
 ```{r}
 #save plot
-plotPDF(heatmapEM, name = "Motifs-Enriched-Marker-Heatmap", width = 8, height = 6, ArchRProj = projMulti4, addDOC = FALSE)
-rm(heatmapEM)
+plotPDF(heatmapEM, name = "Motifs-Enriched-Marker-Heatmap", width = 15, height = 7, ArchRProj = projMulti4, addDOC = FALSE)
+#rm(heatmapEM)
 ```
-
-
-### ArchR Enrichment
-Can use other collections in order to identify enrichment motifs
-
-- Encode
-- Bulk ATAC-seq
-- Codex
-(check ArchR_multi_complete script for the corresponding code)
 
 
 ## ChromVAR Deviations Enrichment (point 13 in manual)
