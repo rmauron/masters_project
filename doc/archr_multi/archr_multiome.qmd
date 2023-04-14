@@ -1732,14 +1732,14 @@ for (i in 1:length(useGroups_list)) {
     )
     markerTest[[i]] <- nam
     
-    #plot Volcano for each clusters and save them
-    pv <- plotMarkers(seMarker = nam, 
-                 name = useGroups_list[i], 
-                 cutOff = "FDR <= 0.5 & abs(Log2FC) >= 1",
-                 plotAs = "Volcano")
-    #print(pv) #print the plot
-    plot_type <- "volcano-by-cluster"
-    plotPDF(pv, name = gsub(" ", "-",paste(plot_type, useGroups_list[i])), width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE) #save plot
+    # #plot Volcano for each clusters and save them
+    # pv <- plotMarkers(seMarker = nam, 
+    #              name = useGroups_list[i], 
+    #              cutOff = "FDR <= 0.5 & abs(Log2FC) >= 1",
+    #              plotAs = "Volcano")
+    # #print(pv) #print the plot
+    # plot_type <- "volcano-by-cluster"
+    # plotPDF(pv, name = gsub(" ", "-",paste(plot_type, useGroups_list[i])), width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE) #save plot
     
 
     #marker_pairwise_significant for each iteration with cell names
@@ -1766,47 +1766,10 @@ for (i in seq_along(markerTest)) {
 ```
 
 
-# to be removed
 
-```{r}
-#plot Volcano of difference between the 2 conditions
-
-# pv <- plotMarkers(seMarker = markerTest[[1]], 
-#                  name = useGroups_list[i], 
-#                  cutOff = "FDR <= 0.5 & abs(Log2FC) >= 1",
-#                  plotAs = "Volcano")
-# print(pv) #print the plot
-# plot_type <- "volcano-markers"
-# plotPDF(pv, name = gsub(" ", "-",paste(plot_type, useGroups_list[i])), width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE) #save plot
-```
-
-
-```{r}
-# #pairwise testing withing "Cholinergic,_monoaminergic_and_peptidergic_neurons" cluster
-# marker_Cholinergic <- getMarkerFeatures(
-#   ArchRProj = projMulti4, 
-#   useMatrix = "PeakMatrix",
-#   groupBy = "CellType_Condition",
-#   testMethod = "wilcoxon",
-#   bias = c("TSSEnrichment", 
-#             "log10(nFrags)", 
-#             "log10(Gex_nUMI)"),
-#   useGroups = "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CF",
-#   bgdGroups = "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CG"
-# )
-# 
-# 
-# marker_Cholinergic_significant <- as.data.frame(marker_Cholinergic@assays@data@listData)
-# marker_Cholinergic_significant <- setnames(marker_Cholinergic_significant, c("Log2FC", "Mean", "FDR", "Pval", "MeanDiff", "AUC", "MeanBGD"))
-# marker_Cholinergic_significant <- marker_Cholinergic_significant[
-#     ((marker_Cholinergic_significant$FDR <= 0.5) & (marker_Cholinergic_significant$Log2FC >= 1)),] #& (marker_Cholinergic_significant$Log2FC >= 1 | marker_Cholinergic_significant$Log2FC <= 1 )),]
-# marker_Cholinergic_significant <- marker_Cholinergic_significant[
-#     ((marker_Cholinergic_significant$Log2FC >= 1)),]
-# marker_Cholinergic_significant <- marker_Cholinergic_significant %>% drop_na()
-```
-
-
-# to be removed since we are not interested in the difference between clusters.
+### Plotting Marker Peaks
+Here, markers are calculated by clusters and condition (CellType_Condition).
+A heatmap of the correponding markers is plotted.
 
 ```{r}
 #| message: false
@@ -1817,7 +1780,7 @@ for (i in seq_along(markerTest)) {
 markersPeaks <- getMarkerFeatures(
     ArchRProj = projMulti4, 
     useMatrix = "PeakMatrix", 
-    groupBy = "predictedGroup_Un_3", #in CellColData
+    groupBy = "CellType_Condition", #in CellColData
     bias = c("TSSEnrichment", 
              "log10(nFrags)", 
              "log10(Gex_nUMI)"), 
@@ -1826,40 +1789,7 @@ markersPeaks <- getMarkerFeatures(
 ```
 
 
-
-```{r}
-#use the getMarkers() function to retrieve particular slices of this SummarizedExperiment that we are interested in
-#return a list of DataFrame objects, one for each cell group
-markerList <- getMarkers(markersPeaks, 
-                         cutOff = "FDR <= 0.01 & Log2FC >= 1")
-markerList
-```
-
-
-```{r}
-#return a GRangesList instead of a DataFrame object.
-markerList <- getMarkers(markersPeaks, 
-                         cutOff = "FDR <= 0.01 & Log2FC >= 1", 
-                         returnGR = TRUE)
-markerList
-```
-
-
-```{r}
-#return a GRangesList instead of a DataFrame object.
-markerList_Cholinergic <- getMarkers(marker_Cholinergic, 
-                         cutOff = "FDR <= 0.01 & Log2FC >= 1", 
-                         returnGR = TRUE)
-markerList_Cholinergic
-
-```
-
-
-### Plotting Marker Peaks
-
-multiple plotting functions to interact with the SummarizedExperiment objects returned by getMarkerFeatures()
-
-#### Marker Peak Heatmaps ??? for each cluster??
+#### markersPeak Heatmap
 
 ```{r}
 #| message: false
@@ -1887,22 +1817,17 @@ rm(heatmapPeaks)
 
 
 
-
 ### markerConditions
-Can retrieve the most significant markers between CF and CG !!!
+We can retrieve the **overall most significant markers between CF and CG** ignoring the cluster it comes from.
 
 ```{r}
 #| message: false
 #| warning: false
 #| output: false
 
-# # group 1: useGroups
-# # group 2: bgdGroups
-getAvailableMatrices(projMulti4)
-#indentify marker peaks by calling addMarkerFeatures()
 markersPeaksCondition <- getMarkerFeatures(
     ArchRProj = projMulti4, 
-    useMatrix = "PeakMatrix", #"PeakMatrix", 
+    useMatrix = "PeakMatrix",
     groupBy = "Conditions", #in CellColData
     bias = c("TSSEnrichment", 
              "log10(nFrags)", 
@@ -1918,7 +1843,7 @@ markersPeaksCondition <- getMarkerFeatures(
 #plot Volcano
 pv <- plotMarkers(
     seMarker = markersPeaksCondition,
-    name = "CF", #change cell type
+    name = "CF", #that is in the parameter "groupBy" above. Up/down regulation according to this name.
     cutOff = "(FDR <= 0.1) & (Log2FC >= 1 | Log2FC <= 1)",#"FDR <= 0.1 & abs(Log2FC) >= 0.5",
     plotAs = "Volcano")
 pv
@@ -1927,7 +1852,7 @@ pv
 
 ```{r}
 #save plots
-plotPDF(pv, name = "Conditions-PeakMarkers-Volcano", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+plotPDF(pv, name = "Overall-Conditions-PeakMarkers-Volcano", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
 rm(pv)
 ```
 
@@ -1937,13 +1862,9 @@ rm(pv)
 #| warning: false
 #| output: false
 
-# # group 1: useGroups
-# # group 2: bgdGroups
-getAvailableMatrices(projMulti4)
-#indentify marker peaks by calling addMarkerFeatures()
 markersGenesCondition <- getMarkerFeatures(
     ArchRProj = projMulti4, 
-    useMatrix = "GeneExpressionMatrix", #"PeakMatrix", 
+    useMatrix = "GeneExpressionMatrix", #normally: "PeakMatrix", but can also generate differences in gene expression
     groupBy = "Conditions", #in CellColData
     bias = c("TSSEnrichment", 
              "log10(nFrags)", 
@@ -1967,15 +1888,14 @@ pv
 
 ```{r}
 #save plots
-plotPDF(pv, name = "Conditions-GeneExpression-Volcano", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+plotPDF(pv, name = "Overall-Conditions-GeneExpression-Volcano", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
 rm(pv)
 ```
 
 
 ## Motif and Feature Enrichment (point 12 in manual)
 
-Want to predict what transcription factors may be mediating the binding events that create those accessible chromatin sites.
-
+Want to **predict what transcription factors may be mediating the binding events that create those accessible chromatin sites**.
 Can look for motifs that are enriched in peaks that are up or down regulated in various cell types.
 
 - add these motif annotations to our project
@@ -2002,65 +1922,66 @@ We can then use the differential testing SummarizedExperiment object markerTest 
 #| message: false
 #| warning: false
 
-#based on the markerTest from previous analysis or the entire markerPeaks
-motifsUp <- peakAnnoEnrichment(
-    seMarker = markersPeaks, #markerTest,
-    ArchRProj = projMulti4,
-    peakAnnotation = "Motif",
-    cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
-  )
+# #based on the markerTest from previous analysis or the entire markerPeaks
+# motifsUp <- peakAnnoEnrichment(
+#     seMarker = markersPeaks, #markerTest,
+#     ArchRProj = projMulti4,
+#     peakAnnotation = "Motif",
+#     cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
+#   )
+# 
+# #motifs enrichment from differential testing among conditions
+# motifsUpCondition <- peakAnnoEnrichment(
+#     seMarker = markersPeaksCondition, #markerTest,
+#     ArchRProj = projMulti4,
+#     peakAnnotation = "Motif",
+#     cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
+#   )
 
-#motifs enrichment from differential testing among conditions
-motifsUpCondition <- peakAnnoEnrichment(
-    seMarker = markersPeaksCondition, #markerTest,
-    ArchRProj = projMulti4,
-    peakAnnotation = "Motif",
-    cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
-  )
-
+################## need to iterate through thissssss
 motifsUp_Cholinergic <- peakAnnoEnrichment(
-    seMarker = marker_Cholinergic, #markerTest,
+    seMarker = markerTest,
     ArchRProj = projMulti4,
     peakAnnotation = "Motif",
     cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
   )
 
-motifsUp_Oligodendrocytes <- peakAnnoEnrichment(
-    seMarker = marker_Oligodendrocytes, #markerTest,
-    ArchRProj = projMulti4,
-    peakAnnotation = "Motif",
-    cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
-  )
+# motifsUp_Oligodendrocytes <- peakAnnoEnrichment(
+#     seMarker = marker_Oligodendrocytes, #markerTest,
+#     ArchRProj = projMulti4,
+#     peakAnnotation = "Motif",
+#     cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
+#   )
 
 #based on the markerTest from previous analysis or the entire markerPeaks
 motifsDown <- peakAnnoEnrichment(
-    seMarker = markersPeaks, #markerTest,
+    seMarker = markerTest, #markerTest,
     ArchRProj = projMulti4,
     peakAnnotation = "Motif",
     cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
   )
 
-#motifs enrichment from differential testing among conditions
-motifsDownCondition <- peakAnnoEnrichment(
-    seMarker = markersPeaksCondition, #markerTest,
-    ArchRProj = projMulti4,
-    peakAnnotation = "Motif",
-    cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
-  )
-
-motifsDown_Cholinergic <- peakAnnoEnrichment(
-    seMarker = marker_Cholinergic, #markerTest,
-    ArchRProj = projMulti4,
-    peakAnnotation = "Motif",
-    cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
-  )
-
-motifsDown_Oligodendrocytes <- peakAnnoEnrichment(
-    seMarker = marker_Oligodendrocytes, #markerTest,
-    ArchRProj = projMulti4,
-    peakAnnotation = "Motif",
-    cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
-  )
+# #motifs enrichment from differential testing among conditions
+# motifsDownCondition <- peakAnnoEnrichment(
+#     seMarker = markersPeaksCondition, #markerTest,
+#     ArchRProj = projMulti4,
+#     peakAnnotation = "Motif",
+#     cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
+#   )
+# 
+# motifsDown_Cholinergic <- peakAnnoEnrichment(
+#     seMarker = marker_Cholinergic, #markerTest,
+#     ArchRProj = projMulti4,
+#     peakAnnotation = "Motif",
+#     cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
+#   )
+# 
+# motifsDown_Oligodendrocytes <- peakAnnoEnrichment(
+#     seMarker = marker_Oligodendrocytes, #markerTest,
+#     ArchRProj = projMulti4,
+#     peakAnnotation = "Motif",
+#     cutOff = "FDR <= 0.1 & Log2FC <= -0.5"
+#   )
 ```
 
 ### Motifs up among every cells
