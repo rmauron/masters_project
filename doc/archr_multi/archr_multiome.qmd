@@ -1621,7 +1621,89 @@ plotPDF(p_cond, p_sample, p_comb,
 #### Clusters metrics
 
 ```{r}
-#here want to perform metrics of each clusters 
+#here want to perform metrics of each clusters
+metrics <- as.data.frame(table(projMulti4@cellColData@listData[["predictedGroup_Un_3"]]))
+metrics <- as.data.frame(t(metrics))
+
+rownames(metrics)[1] <- "Cell type"
+rownames(metrics)[2] <- "Total cells"
+
+# renames columns
+for (i in 1:length(metrics)) {
+    colnames(metrics)[i] <- paste0("Cluster", i)
+}
+
+# Add cells from CF
+my_table <- table(projMulti4@cellColData@listData[["CellType_Condition"]]) 
+matches <- my_table[names(my_table) %in% grep("CF", sort(unique(projMulti4@cellColData@listData[["CellType_Condition"]])), value = T)]
+metrics <- rbind(metrics, t(as.data.frame(matches)[2])[1,])
+rownames(metrics)[3] <- "CF cells"
+
+# Add cells from CG
+my_table <- table(projMulti4@cellColData@listData[["CellType_Condition"]]) 
+matches <- my_table[names(my_table) %in% grep("CG", sort(unique(projMulti4@cellColData@listData[["CellType_Condition"]])), value = T)]
+metrics <- rbind(metrics, t(as.data.frame(matches)[2])[1,])
+rownames(metrics)[4] <- "CG cells"
+
+# Add ratio CF/CG
+metrics <- rbind(metrics,  formatC(as.integer(metrics[3,])/as.numeric(metrics[4,]), digits = 3, format = "f"))
+rownames(metrics)[5] <- "Ratio CF/CG"
+
+# Add cells from CF1
+my_table <- table(projMulti4@cellColData@listData[["CellType_Sample"]]) 
+matches <- my_table[names(my_table) %in% grep("CF1", sort(unique(projMulti4@cellColData@listData[["CellType_Sample"]])), value = T)]
+metrics <- rbind(metrics, t(as.data.frame(matches)[2])[1,])
+rownames(metrics)[6] <- "CF1 cells"
+
+# Add cells from CF2
+my_table <- table(projMulti4@cellColData@listData[["CellType_Sample"]]) 
+matches <- my_table[names(my_table) %in% grep("CF2", sort(unique(projMulti4@cellColData@listData[["CellType_Sample"]])), value = T)]
+metrics <- rbind(metrics, t(as.data.frame(matches)[2])[1,])
+rownames(metrics)[7] <- "CF2 cells"
+
+# Add cells from CF7
+my_table <- table(projMulti4@cellColData@listData[["CellType_Sample"]]) 
+matches <- my_table[names(my_table) %in% grep("CF7", sort(unique(projMulti4@cellColData@listData[["CellType_Sample"]])), value = T)]
+metrics <- rbind(metrics, t(as.data.frame(matches)[2])[1,])
+rownames(metrics)[8] <- "CF7 cells"
+
+# Add cells from CG8
+my_table <- table(projMulti4@cellColData@listData[["CellType_Sample"]]) 
+matches <- my_table[names(my_table) %in% grep("CG8", sort(unique(projMulti4@cellColData@listData[["CellType_Sample"]])), value = T)]
+metrics <- rbind(metrics, t(as.data.frame(matches)[2])[1,])
+rownames(metrics)[9] <- "CG8 cells"
+
+# Add cells from CG9
+my_table <- table(projMulti4@cellColData@listData[["CellType_Sample"]]) 
+matches <- my_table[names(my_table) %in% grep("CG9", sort(unique(projMulti4@cellColData@listData[["CellType_Sample"]])), value = T)]
+metrics <- rbind(metrics, t(as.data.frame(matches)[2])[1,])
+rownames(metrics)[10] <- "CG9 cells"
+
+# Add ratio CF1/total
+metrics <- rbind(metrics,  formatC(as.integer(metrics[6,])/as.numeric(metrics[2,]), digits = 3, format = "f"))
+rownames(metrics)[11] <- "Ratio CF1/total"
+
+# Add ratio CF2/total
+metrics <- rbind(metrics,  formatC(as.integer(metrics[7,])/as.numeric(metrics[2,]), digits = 3, format = "f"))
+rownames(metrics)[12] <- "Ratio CF2/total"
+
+# Add ratio CF7/total
+metrics <- rbind(metrics,  formatC(as.integer(metrics[8,])/as.numeric(metrics[2,]), digits = 3, format = "f"))
+rownames(metrics)[13] <- "Ratio CF7/total"
+
+# Add ratio CG8/total
+metrics <- rbind(metrics,  formatC(as.integer(metrics[9,])/as.numeric(metrics[2,]), digits = 3, format = "f"))
+rownames(metrics)[14] <- "Ratio CG8/total"
+
+# Add ratio CG9/total
+metrics <- rbind(metrics, formatC(as.integer(metrics[10,])/as.numeric(metrics[2,]), digits = 3, format = "f"))
+rownames(metrics)[15] <- "Ratio CG9/total"
+
+# print dataframe
+metrics
+
+# Export dataframe as csv (for report)
+write.csv(metrics, "/Users/raphaelmauron/masters_project/doc/archr_multi/metrics.csv", row.names=T)
 ```
 
 
