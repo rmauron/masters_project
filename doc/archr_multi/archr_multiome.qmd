@@ -1817,7 +1817,7 @@ for (i in 1:length(useGroups_list)) {
     #plot Volcano for each clusters and save them
     pv <- plotMarkers(seMarker = nam,
                  name = useGroups_list[i],
-                 cutOff = "FDR <= 0.5 & abs(Log2FC) >= 1",
+                 cutOff = "FDR <= 0.1 & abs(Log2FC) >= 1",
                  plotAs = "Volcano")
     #print(pv) #print the plot
     plot_type <- "volcano-by-cluster"
@@ -1828,7 +1828,7 @@ for (i in 1:length(useGroups_list)) {
     nam_significant <- gsub(" ", "", paste0("marker_pairwise_significant", "_", useGroups_list[i]))
     nam_significant <- as.data.frame(nam@assays@data@listData)
     nam_significant <- setnames(nam_significant, c("Log2FC", "Mean", "FDR", "Pval", "MeanDiff", "AUC", "MeanBGD"))
-    nam_significant <- nam_significant[((nam_significant$FDR <= 0.5) & (nam_significant$Log2FC >= 1)),] #& (nam_significant$Log2FC >= 1 | nam_significant$Log2FC <= 1 )),]
+    nam_significant <- nam_significant[((nam_significant$FDR <= 0.1) & (nam_significant$Log2FC >= 1)),] #& (nam_significant$Log2FC >= 1 | nam_significant$Log2FC <= 1 )),]
     nam_significant <- nam_significant[((nam_significant$Log2FC >= 1)),]
     nam_significant <- nam_significant %>% drop_na()
     marker_significant[[i]] <- nam_significant
@@ -2022,7 +2022,7 @@ for (i in seq_along(markerTest)) {
         seMarker = markerTest[[i]],
         ArchRProj = projMulti4,
         peakAnnotation = "Motif",
-        cutOff = "FDR <= 0.5 & Log2FC >= 0.5"
+        cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
     )
     motifsUp[[i]] <- up
     
@@ -2090,6 +2090,28 @@ for (i in seq_along(markerTest)) {
 #   names(motifsUp[[i]]) <- useGroups_list[i]
 #   names(motifsDo[[i]]) <- useGroups_list[i]
 # }
+```
+
+
+From motifs Up and motifs Down in lists df_motifsUp and df_motifsDo, we can generate a list that contains the top5 values of each cluster to gather the motifs for further downstream analysis like co-accessibility.
+```{r}
+marker_motifs_top5 <- c()
+for (i in seq_along(df_motifsUp)) {
+    top5 <- df_motifsUp[[i]][["TF"]][1:5]
+    top5 <- gsub("_.*", "", top5) #remove the characters after the "_" in order to make them compatible for the rest of the code,
+    marker_motifs_top5 <- append(marker_motifs_top5, top5)
+}
+
+for (i in seq_along(df_motifsDo)) {
+    top5 <- df_motifsDo[[i]][["TF"]][1:5]
+    top5 <- gsub("_.*", "", top5) #remove the characters after the "_" in order to make them compatible for the rest of the code,
+    marker_motifs_top5 <- append(marker_motifs_top5, top5)
+}
+
+
+
+marker_motifs_top5 <- unique(marker_motifs_top5)
+print(marker_motifs_top5)
 ```
 
 
@@ -2227,6 +2249,7 @@ plotPDF(heatmapEM, name = "Motifs-Enriched-Marker-Heatmap", width = 15, height =
 
 Here allow a per-cell basis enrichment count.
 chromVAR also account for Tn5 transposases insertion bias !!!
+Information is needed later for "identification of positive TF-regulation"
 
 ArchR uses chromVAR:
 - reads in the global accessibility per peak across all cells in each sub-samples
@@ -2250,6 +2273,7 @@ if("Motif" %ni% names(projMulti4@peakAnnotation)){
 projMulti4 <- addBgdPeaks(projMulti4)
 ```
 
+!!! Can take some time.
 
 ```{r}
 #| message: false
@@ -2270,10 +2294,10 @@ projMulti4 <- addDeviationsMatrix(
 plotVarDev <- getVarDeviations(projMulti4, name = "MotifMatrix", plot = TRUE)
 ```
 
-
+#### Overall chromVAR variability.
 ```{r}
 #plot
-#plotVarDev
+plotVarDev
 ```
 
 
@@ -2284,12 +2308,37 @@ rm(plotVarDev)
 ```
 
 
+```{r}
+diffmotif <- getMarkerFeatures(
+    ArchRProj = projMulti4,
+    testMethod = "wilcoxon",
+    binarize = F,
+    useMatrix = "MotifMatrix",
+    useSeqnames = "z",
+    groupBy = "CellType_Condition",
+    useGroups = "Telenchephalon_interneurons_x_CF",
+    bgdGroups = "Telenchephalon_interneurons_x_CG"
+)
+```
+
+```{r}
+li <- as.data.frame(diffmotif@elementMetadata@listData[["name"]])
+li$MeanDiff <- as.numeric(abs(diffmotif@assays@data@listData[["MeanDiff"]][,1]))
+colnames(li) <- c("name", "MeanDiff")
+li <- li[order(-li$MeanDiff),]
+
+
+li
+```
+
+
 #### Analyze variability of a subset of features
 
 ```{r}
 #to analyze subset of features
 # motifs <- c() #instead of using "my_markers" you can specify another list here
-motifs <- my_markers
+### maybe take the marker_motifs_top5
+motifs <- marker_motifs_top5
 markerMotifs <- getFeatures(projMulti4, select = paste(motifs, collapse="|"), useMatrix = "MotifMatrix")
 markerMotifs
 ```
@@ -2298,7 +2347,7 @@ markerMotifs
 ```{r}
 #want to remove a specific marker
 markerMotifs <- grep("z:", markerMotifs, value = TRUE) #keeps only z-values
-markerMotifs <- markerMotifs[markerMotifs %ni% "z:SREBF1_22"] #remove this specific marker
+#markerMotifs <- markerMotifs[markerMotifs %ni% "z:SREBF1_22"] #remove this specific marker
 markerMotifs
 ```
 
