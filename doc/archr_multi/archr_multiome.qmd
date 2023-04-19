@@ -2409,7 +2409,7 @@ markerMotifs
 #these impute weights allow us to smooth the signal across nearby cells which is helpful in the context of our sparse scATAC-seq data
 
 p <- plotGroups(ArchRProj = projMulti4, 
-  groupBy = "predictedGroup_Un_3", #"Conditions", 
+  groupBy = "Conditions" ,#"predictedGroup_Un_3", #"Conditions", 
   colorBy = "MotifMatrix", 
   name = markerMotifs,
   imputeWeights = getImputeWeights(projMulti4)
@@ -2445,7 +2445,7 @@ p2 <- lapply(seq_along(p), function(x){
 
 ```{r}
 #save plot
-plotPDF(p, name = "Plot-Groups-Deviations-w-Imputation", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
+plotPDF(p, name = "Plot-Groups-Conditions-Deviations-w-Imputation", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
 rm(p)
 ```
 
@@ -2458,7 +2458,7 @@ p <- plotEmbedding(
     ArchRProj = projMulti4, 
     colorBy = "MotifMatrix", 
     name = sort(markerMotifs), 
-    embedding = "UMAPHarmony", #can change embedding here
+    embedding = "UMAPHarmony_ATAC", #UMAPHarmony", #can change embedding here
     imputeWeights = getImputeWeights(projMulti4)
 )
 ```
@@ -2499,9 +2499,10 @@ To see how these TF deviation z-scores compare to the inferred gene expression v
 markerRNA <- getFeatures(projMulti4, 
                          select = paste(motifs, collapse="|"), 
                          useMatrix = "GeneExpressionMatrix")
-markerRNA <- markerRNA[markerRNA %ni% c("Chic1","Egfros", "Gba2", "Kptn", "Nptn", "Optn", "Ppargc1a", "Ppargc1b","Prox1os", "Qsox2", "Rptn", "Sox2ot", "Spink1", "Spink10", "Spink11", "Spink12", "Spink13", "Spink14", "Sox6os", "Sox21", "Uchl1os", "Vps35l")] #exclude some motifs that are not in "my_markers"
+
+markerRNA <- markerRNA[markerRNA %in% motifs] #exclude some motifs that are not in "motifs"
 sort(markerRNA)
-#sort(my_markers) #to compare if needed
+#sort(motifs) #to compare if needed
 ```
 
 
@@ -2510,7 +2511,7 @@ p <- plotEmbedding(
     ArchRProj = projMulti4, 
     colorBy = "GeneExpressionMatrix", 
     name = sort(markerRNA), 
-    embedding = "UMAPHarmony",
+    embedding = "UMAPHarmony_ATAC",
     imputeWeights = getImputeWeights(projMulti4)
 )
 ```
@@ -2545,7 +2546,7 @@ rm(p)
 Similarly, because we previously linked our scATAC-seq data with corresponding scRNA-seq data, we can plot the linked gene expression for each of these TFs on the UMAP embedding.
 
 ```{r}
-getAvailableMatrices(projMulti4)
+#getAvailableMatrices(projMulti4)
 ```
 
 
@@ -2553,9 +2554,8 @@ getAvailableMatrices(projMulti4)
 markerRNA <- getFeatures(projMulti4,
                          select = paste(motifs, collapse="|"),
                          useMatrix = "GeneIntegrationMatrix_db_3")
-
-markerRNA <- markerRNA <- markerRNA[markerRNA %ni% c("Chic1","Egfros", "Gba2", "Kptn", "Nptn", "Optn", "Ppargc1a", "Ppargc1b","Prox1os", "Qsox2", "Rptn", "Sox2ot", "Spink1", "Spink10", "Spink11", "Spink12", "Spink13", "Spink14", "Sox6os", "Sox21", "Uchl1os", "Vps35l")] #exclude some motifs that are not in "my_markers"
-markerRNA
+markerRNA <- markerRNA[markerRNA %in% motifs] #exclude some motifs that are not in "motifs"
+#markerRNA
 ```
 
 
@@ -2564,7 +2564,7 @@ p <- plotEmbedding(
     ArchRProj = projMulti4,
     colorBy = "GeneIntegrationMatrix_db_3",
     name = sort(markerRNA),
-    embedding = "UMAPHarmony",
+    embedding = "UMAPHarmony_ATAC",
     continuousSet = "blueYellow",
     imputeWeights = getImputeWeights(projMulti4)
 )
@@ -2590,7 +2590,7 @@ p2 <- lapply(p, function(x){
 ```{r}
 #to save
 plotPDF(plotList = p, 
-    name = "linked-gene-expression-of-TF.pdf", 
+    name = "Plot-Groups-Deviations-w-linked-gene-expression-of-TF-embedding.pdf", 
     ArchRProj = projMulti4, 
     addDOC = FALSE, width = 5, height = 5)
 rm(p)
@@ -2622,10 +2622,10 @@ motifPositions
 ```{r}
 #list of marker to use for the subset
 # motifs <- c() #specify another motifs list here if want others than my_markers
-motifs <- c(my_markers, "Zfp148", "Tcf15", "Scx")
 
 markerMotifs <- unlist(lapply(motifs, function(x) grep(x, names(motifPositions), value = TRUE)))
-markerMotifs <- markerMotifs[markerMotifs %ni% "SREBF1_22"]
+#markerMotifs <- markerMotifs[markerMotifs %ni% "SREBF1_22"] #can exclude motifs here
+markerMotifs <- markerMotifs[markerMotifs %in% unique(chromVAR_top_abs$name)]
 markerMotifs
 ```
 
@@ -2633,7 +2633,6 @@ markerMotifs
 ```{r}
 #| message: false
 #| warning: false
-
 projMulti4 <- addGroupCoverages(ArchRProj = projMulti4,
                                 groupBy = "predictedGroup_Un_3")
 ```
@@ -2691,15 +2690,15 @@ plotFootprints(
 Normalization is highly recommended but it is possible to plot the footprints without normalization.
 
 ```{r}
-#no normalization
-plotFootprints(
-  seFoot = seFoot,
-  ArchRProj = projMulti4, 
-  normMethod = "None", #says that no normalization is performed
-  plotName = "Footprints-No-Normalization",
-  addDOC = FALSE,
-  smoothWindow = 5
-)
+# #no normalization
+# plotFootprints(
+#   seFoot = seFoot,
+#   ArchRProj = projMulti4, 
+#   normMethod = "None", #says that no normalization is performed
+#   plotName = "Footprints-No-Normalization",
+#   addDOC = FALSE,
+#   smoothWindow = 5
+# )
 ```
 
 
@@ -2757,7 +2756,7 @@ Co-accessibility is a correlation in accessibility between 2 peaks across many s
 #add co-accessibility peaks to the object
 projMulti4 <- addCoAccessibility(
     ArchRProj = projMulti4,
-    reducedDims = "Harmony" #can change dimensionality reduction here
+    reducedDims = "Harmony_ATAC" #can change dimensionality reduction here
 )
 ```
 
@@ -2806,13 +2805,13 @@ cA[[1]]
 Can plot on the browser a list of our markerGenes
 
 ```{r}
-# markerGenes <- c()
-markerGenes <- my_markers
+# plot every name from the list "motifs"
+
 
 p <- plotBrowserTrack(
     ArchRProj = projMulti4, 
     groupBy = "predictedGroup_Un_3", 
-    geneSymbol = "Dkk3", #my_markers, #markerGenes, 
+    geneSymbol = motifs, #specify motifs to plot here
     upstream = 50000,
     downstream = 50000,
     loops = getCoAccessibility(projMulti4)
