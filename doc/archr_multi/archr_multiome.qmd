@@ -1733,13 +1733,13 @@ projMulti4 <- projMulti3
 #add coverage (point 9 in manual)
 projMulti4 <- addGroupCoverages(
     ArchRProj = projMulti4, 
-    groupBy = "Clusters_ATAC" #in CellColData, 
+    groupBy = "CellType_Condition", #"Clusters_ATAC" #in CellColData, 
     )
 
 #get path to the python tool installed through miniconda (MACS2)
 projMulti4 <- addReproduciblePeakSet(
     ArchRProj = projMulti4, 
-    groupBy = "Clusters_ATAC", #in CellColData, 
+    groupBy = "CellType_Condition", #"Clusters_ATAC", #in CellColData, 
     pathToMacs2 = "/usr/local/bin/macs2"#"/Users/raphaelmauron/Library/Python/3.9/bin/macs2"
         )
 
@@ -1749,7 +1749,7 @@ projMulti4 <- addPeakMatrix(ArchRProj = projMulti4)
 #peak2genes (point 15.3 in manual)
 projMulti4 <- addPeak2GeneLinks(
     ArchRProj = projMulti4, 
-    reducedDims = "Harmony", #"LSI_Combined", 
+    reducedDims = "Harmony_ATAC", #"LSI_Combined", 
     useMatrix = "GeneExpressionMatrix")
 
 p2g <- getPeak2GeneLinks(ArchRProj = projMulti4)
@@ -1788,7 +1788,6 @@ Those list of dataframes are needed later for the volcano plots or motif enrichm
 
 ```{r}
 #pairwise testing for each cluster between conditions
-
 i <- 1
 marker_significant <- list() #list of dataframes of marker_pairwise_significant
 markerTest <- list() #list of dataframes of marker_pairwise used for Volcano
@@ -1800,7 +1799,6 @@ for (i in 1:length(useGroups_list)) {
     
     #marker_pairwise for each iteration with cell names
     nam <- gsub(" ", "", paste0("marker_pairwise", "_", useGroups_list[i]))
-    #name <- gsub(" ", "", paste0("marker_pairwise", "_", useGroups_list[i]))
     nam <- getMarkerFeatures(
       ArchRProj = projMulti4, 
       useMatrix = "PeakMatrix",
@@ -1828,14 +1826,14 @@ for (i in 1:length(useGroups_list)) {
     nam_significant <- gsub(" ", "", paste0("marker_pairwise_significant", "_", useGroups_list[i]))
     nam_significant <- as.data.frame(nam@assays@data@listData)
     nam_significant <- setnames(nam_significant, c("Log2FC", "Mean", "FDR", "Pval", "MeanDiff", "AUC", "MeanBGD"))
-    nam_significant <- nam_significant[((nam_significant$FDR <= 0.1) & (nam_significant$Log2FC >= 1)),] #& (nam_significant$Log2FC >= 1 | nam_significant$Log2FC <= 1 )),]
+    nam_significant <- nam_significant[((nam_significant$FDR <= 0.1) & (nam_significant$Log2FC >= 1)),]
     nam_significant <- nam_significant[((nam_significant$Log2FC >= 1)),]
     nam_significant <- nam_significant %>% drop_na()
     marker_significant[[i]] <- nam_significant
     
     i <- i+1
 }
-rm(plot_type)
+rm(plot_type, nam_significant, nam, i, pv)
 ```
 
 
@@ -1846,6 +1844,7 @@ for (i in seq_along(markerTest)) {
   names(markerTest[[i]]) <- useGroups_list[i]
   names(marker_significant[[i]]) <- useGroups_list[i]
 }
+rm(i)
 ```
 
 
@@ -1929,7 +1928,6 @@ pv <- plotMarkers(
     name = "CF", #that is in the parameter "groupBy" above. Up/down regulation according to this name.
     cutOff = "(FDR <= 0.1) & (Log2FC >= 1 | Log2FC <= 1)",#"FDR <= 0.1 & abs(Log2FC) >= 0.5",
     plotAs = "Volcano")
-pv
 ```
 
 
@@ -1965,7 +1963,6 @@ pv <- plotMarkers(
     name = "CF", #change cell type
     cutOff = "(FDR <= 0.001) & (Log2FC >= 1 | Log2FC <= 1)",#"FDR <= 0.1 & abs(Log2FC) >= 0.5",
     plotAs = "Volcano")
-pv
 ```
 
 
@@ -2631,21 +2628,13 @@ markerMotifs
 
 
 ```{r}
-#| message: false
-#| warning: false
-projMulti4 <- addGroupCoverages(ArchRProj = projMulti4,
-                                groupBy = "predictedGroup_Un_3")
-```
-
-
-```{r}
 #compute footprints for the subset of marker motifs that we previously selected using the getFootprints() function
 #recommended to perform footprinting on a subset of motifs rather than all motifs
 #provide the subset of motifs to footprint via the positions parameter
 seFoot <- getFootprints(
   ArchRProj = projMulti4, 
   positions = motifPositions[markerMotifs], #specify the subset of motifs
-  groupBy = "predictedGroup_Un_3"
+  groupBy = "CellType_Condition"
 )
 ```
 
@@ -2714,7 +2703,7 @@ Here, TSS (Transcription Start Site) insertion profile (= specialized subcase of
 seTSS <- getFootprints(
   ArchRProj = projMulti4, 
   positions = GRangesList(TSS = getTSS(projMulti4)), #specify 
-  groupBy = "predictedGroup_Un_3",
+  groupBy = "CellType_Condition",
   flank = 2000 #extend the footprints on both side of each TSS
 )
 ```
@@ -2810,7 +2799,7 @@ Can plot on the browser a list of our markerGenes
 
 p <- plotBrowserTrack(
     ArchRProj = projMulti4, 
-    groupBy = "predictedGroup_Un_3", 
+    groupBy = "CellType_Condition", 
     geneSymbol = motifs, #specify motifs to plot here
     upstream = 50000,
     downstream = 50000,
@@ -2853,7 +2842,7 @@ Identify "peak to gene links" (done in chapter ("Calling Peaks (point 9 & 10 in 
 
 p <- plotBrowserTrack(
     ArchRProj = projMulti4, 
-    groupBy = "predictedGroup_Un_3", 
+    groupBy = "CellType_Condition", 
     geneSymbol = markerGenes, 
     upstream = 50000,
     downstream = 50000,
@@ -2894,7 +2883,7 @@ To visualize the correspondence of all of our **peak-to-gene links**, we can plo
 #| warning: false
 
 p <- plotPeak2GeneHeatmap(ArchRProj = projMulti4, 
-                          groupBy = "predictedGroup_Un_3")
+                          groupBy = "CellType_Condition")
 ```
 
 
@@ -2932,7 +2921,7 @@ Did that when creating "MotifMatrix"
 #retrieve this data (deviant TF motifs)
 seGroupMotif <- getGroupSE(ArchRProj = projMulti4, 
                            useMatrix = "MotifMatrix", 
-                           groupBy = "predictedGroup_Un_3")
+                           groupBy = "CellType_Condition")
 ```
 
 
