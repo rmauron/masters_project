@@ -1835,6 +1835,7 @@ for (i in 1:length(useGroups_list)) {
     
     i <- i+1
 }
+rm(plot_type)
 ```
 
 
@@ -2112,6 +2113,7 @@ for (i in seq_along(df_motifsDo)) {
 
 marker_motifs_top5 <- unique(marker_motifs_top5)
 print(marker_motifs_top5)
+rm(top5)
 ```
 
 
@@ -2308,27 +2310,73 @@ rm(plotVarDev)
 ```
 
 
+## Run chromVAR for each cluster to get variability between conditions
+- get chromVAR variability for each cluster (chromVAR_condition)
+- get chromVAR variability for each cluster but ranked from MeanDiff (chromVAR_ranked)
+- top 25 of the chromVAR_ranked (chromVAR_top25_up)
+- top 25 down of the chromVAR_ranked (chromVAR_top25_do)
+- top 5 from absolute MeanDiff which doesn't take into consideration if more available in CF or CG
+
 ```{r}
-diffmotif <- getMarkerFeatures(
-    ArchRProj = projMulti4,
-    testMethod = "wilcoxon",
-    binarize = F,
-    useMatrix = "MotifMatrix",
-    useSeqnames = "z",
-    groupBy = "CellType_Condition",
-    useGroups = "Telenchephalon_interneurons_x_CF",
-    bgdGroups = "Telenchephalon_interneurons_x_CG"
-)
+#useGroups_list list of cluster to use 
+#bgdGroups_list
+
+i <- 1
+chromVAR_condition <- list() #list of dataframes of chromVAR variability for each cluster
+chromVAR_ranked <- list() #list of dataframes of chromVAR variability for each cluster
+chromVAR_top25_up <- list() #list of dataframes of chromVAR top25 UP (in CF)
+chromVAR_top25_do <- list() #list of dataframes of chromVAR top25 DOWN (in CF)
+chromVAR_top_abs <- data_frame() #list of dataframes of chromVAR top5 absolute values for motifs to keep for footprinting and more.
+
+for (i in 1:length(useGroups_list)) {
+    #print names of group that is running
+    print(useGroups_list[i])
+    print(bgdGroups_list[i])
+    
+    diffmotif <- gsub(" ", "", paste0("diffmotif", "_", useGroups_list[i]))
+    
+    #get differential variability between condition in each cluster
+    diffmotif <- getMarkerFeatures(
+        ArchRProj = projMulti4,
+        testMethod = "wilcoxon",
+        binarize = F,
+        useMatrix = "MotifMatrix",
+        useSeqnames = "z",
+        groupBy = "CellType_Condition",
+        useGroups = useGroups_list[i],
+        bgdGroups = bgdGroups_list[i]
+    )
+    chromVAR_condition[[i]] <- diffmotif
+    
+    #get ranked motifs by MeanDiff
+    rankedmotif <- gsub(" ", "", paste0("rankedmotif", "_", useGroups_list[i]))
+    rankedmotif <- as.data.frame(diffmotif@elementMetadata@listData[["name"]])
+    rankedmotif$MeanDiff <- as.numeric(diffmotif@assays@data@listData[["MeanDiff"]][,1])
+    colnames(rankedmotif) <- c("name", "MeanDiff")
+    rankedmotif <- rankedmotif[order(-rankedmotif$MeanDiff),]
+    chromVAR_ranked[[i]] <- rankedmotif
+    
+    #get a top50 motifs to run Gene Ontology
+    chromVAR_top25_up[[i]] <-  head(rankedmotif,25) #first 25 rows
+    chromVAR_top25_do[[i]] <- tail(rankedmotif,25) #last 25 rows
+    
+    #get the absolute top5 variable motifs per cluster to keep as motif
+    absolute_ranked <- rankedmotif[order(abs(rankedmotif$MeanDiff), decreasing = T),] #order the dataframe by absolute value of MeanDiff
+    absolute_ranked_top <- head(absolute_ranked["name"],10) 
+    absolute_ranked_top <- cbind(absolute_ranked_top, useGroups_list[i])
+    colnames(absolute_ranked_top)[2] <- "cell_origin"
+    
+    chromVAR_top_abs <- rbind(chromVAR_top_abs, absolute_ranked_top)
+    
+    i <- i+1
+}
 ```
 
+Since the same motifs can appear in different cell type, create a list of unique motifs for further analysis
 ```{r}
-li <- as.data.frame(diffmotif@elementMetadata@listData[["name"]])
-li$MeanDiff <- as.numeric(abs(diffmotif@assays@data@listData[["MeanDiff"]][,1]))
-colnames(li) <- c("name", "MeanDiff")
-li <- li[order(-li$MeanDiff),]
-
-
-li
+chromVAR_top_abs_unique <- unique(chromVAR_top_abs$name)
+chromVAR_top_abs_unique <- sub("_.*", "", chromVAR_top_abs_unique)
+order(chromVAR_top_abs_unique)
 ```
 
 
@@ -2338,7 +2386,7 @@ li
 #to analyze subset of features
 # motifs <- c() #instead of using "my_markers" you can specify another list here
 ### maybe take the marker_motifs_top5
-motifs <- marker_motifs_top5
+motifs <- chromVAR_top_abs_unique
 markerMotifs <- getFeatures(projMulti4, select = paste(motifs, collapse="|"), useMatrix = "MotifMatrix")
 markerMotifs
 ```
