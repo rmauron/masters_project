@@ -2376,7 +2376,7 @@ Since the same motifs can appear in different cell type, create a list of unique
 ```{r}
 chromVAR_top_abs_unique <- unique(chromVAR_top_abs$name)
 chromVAR_top_abs_unique <- sub("_.*", "", chromVAR_top_abs_unique)
-order(chromVAR_top_abs_unique)
+
 ```
 
 
