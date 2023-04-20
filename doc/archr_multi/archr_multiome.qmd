@@ -1837,18 +1837,6 @@ rm(plot_type, nam_significant, nam, i, pv)
 ```
 
 
-```{r}
-#rename each dataframe in markerTest and in marker_significant
-#names are found in "colnames"
-for (i in seq_along(markerTest)) {
-  names(markerTest[[i]]) <- useGroups_list[i]
-  names(marker_significant[[i]]) <- useGroups_list[i]
-}
-rm(i)
-```
-
-
-
 ### Plotting Marker Peaks
 Here, markers are calculated by clusters and condition (CellType_Condition).
 A heatmap of the correponding markers is plotted.
@@ -2011,6 +1999,8 @@ motifsUp <- list() #list of motifsUp after iteration in each markerTest
 motifsDo <- list() #list of motifsDo after iteration in each markerTest
 df_motifsUp <- list() #list of dataframe to make the plots
 df_motifsDo <- list() #list of dataframe to make the plots
+plot_type <- "Markers-Motifs-Enriched-UP"
+
 
 for (i in seq_along(markerTest)) {
     ################# UP:
@@ -2043,7 +2033,6 @@ for (i in seq_along(markerTest)) {
       xlab("Rank Sorted TFs Enriched") +
       scale_color_gradientn(colors = paletteContinuous(set = "comet"))
     
-    plot_type <- "Markers-Motifs-Enriched-UP"
     plotPDF(ggUp, name = gsub(" ", "-",paste(plot_type, useGroups_list[i])), width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE) #save plot
     
     
@@ -2082,12 +2071,7 @@ for (i in seq_along(markerTest)) {
     
 }
 
-# #rename each dataframe in motifsUp and motifsDo
-# #names are found in "colnames"
-# for (i in seq_along(motifsUp)) {
-#   names(motifsUp[[i]]) <- useGroups_list[i]
-#   names(motifsDo[[i]]) <- useGroups_list[i]
-# }
+rm(i, plot_type, up, down)
 ```
 
 
@@ -2107,10 +2091,9 @@ for (i in seq_along(df_motifsDo)) {
 }
 
 
-
 marker_motifs_top5 <- unique(marker_motifs_top5)
 print(marker_motifs_top5)
-rm(top5)
+rm(i, top5)
 ```
 
 
@@ -2148,12 +2131,12 @@ df_motifsDoClusters <- df_motifsDoClusters[order(df_motifsDoClusters$mlog10Padj,
 df_motifsDoClusters$rank <- seq_len(nrow(df_motifsDoClusters))
 ```
 
+
 ```{r}
 #to test the most enriched motifs in the peaks 
 # head(df_motifsUpClusters)
 # head(df_motifsDoClusters)
 ```
-
 
 
 ```{r}
@@ -2172,7 +2155,7 @@ ggUp_CF <- ggplot(df_motifsUpClusters, aes(rank, mlog10Padj, color = mlog10Padj)
   scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
     ggtitle("Motif enrichment among every cells in CF")
 
-ggUp_CF
+#ggUp_CF
 ```
 
 
@@ -2192,7 +2175,7 @@ ggDo_CF <- ggplot(df_motifsDoClusters, aes(rank, mlog10Padj, color = mlog10Padj)
   scale_color_gradientn(colors = paletteContinuous(set = "comet")) +
     ggtitle("Motif enrichment among every cells in CG")
 
-ggDo_CF
+#ggDo_CF
 ```
 
 
@@ -2201,7 +2184,7 @@ ggDo_CF
 plotPDF(ggUp_CF, ggDo_CF, 
         name = "Motifs-Enriched-plot-Condition", 
         width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
-#rm(ggUp_CF, ggDo_CF)
+rm(ggUp_CF, ggDo_CF)
 ```
 
 
@@ -2213,7 +2196,6 @@ Can also perform motif enrichment on our marker peaks identified in using getMar
 ```{r}
 #| message: false
 #| warning: false
-
 enrichMotifs <- peakAnnoEnrichment(
     seMarker = markersPeaks,
     ArchRProj = projMulti4,
@@ -2367,13 +2349,13 @@ for (i in 1:length(useGroups_list)) {
     
     i <- i+1
 }
+rm(i, diffmotif, rankedmotif)
 ```
 
 Since the same motifs can appear in different cell type, create a list of unique motifs for further analysis
 ```{r}
 chromVAR_top_abs_unique <- unique(chromVAR_top_abs$name)
 chromVAR_top_abs_unique <- sub("_.*", "", chromVAR_top_abs_unique)
-
 ```
 
 
@@ -2583,6 +2565,7 @@ p2 <- lapply(p, function(x){
 })
 #do.call(cowplot::plot_grid, c(list(ncol = 3),p2))
 ```
+
 
 ```{r}
 #to save
@@ -2795,12 +2778,11 @@ Can plot on the browser a list of our markerGenes
 
 ```{r}
 # plot every name from the list "motifs"
-
-
+motifs_for_co_acc <- motifs[11:20]
 p <- plotBrowserTrack(
     ArchRProj = projMulti4, 
     groupBy = "CellType_Condition", 
-    geneSymbol = motifs, #specify motifs to plot here
+    geneSymbol = motifs_for_co_acc, #specify motifs to plot here
     upstream = 50000,
     downstream = 50000,
     loops = getCoAccessibility(projMulti4)
@@ -2818,7 +2800,7 @@ p <- plotBrowserTrack(
 ```{r}
 #to save
 plotPDF(plotList = p, 
-    name = "Plot-Tracks-Marker-Genes-with-CoAccessibility.pdf", 
+    name = "Plot-Tracks-Marker-Genes-with-CoAccessibility11_20.pdf", 
     ArchRProj = projMulti4, 
     addDOC = FALSE, width = 5, height = 5)
 rm(p)
