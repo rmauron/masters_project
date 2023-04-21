@@ -2663,14 +2663,14 @@ Normalization is highly recommended but it is possible to plot the footprints wi
 
 ```{r}
 # #no normalization
-# plotFootprints(
-#   seFoot = seFoot,
-#   ArchRProj = projMulti4, 
-#   normMethod = "None", #says that no normalization is performed
-#   plotName = "Footprints-No-Normalization",
-#   addDOC = FALSE,
-#   smoothWindow = 5
-# )
+plotFootprints(
+  seFoot = seFoot,
+  ArchRProj = projMulti4,
+  normMethod = "None", #says that no normalization is performed
+  plotName = "Footprints-No-Normalization",
+  addDOC = FALSE,
+  smoothWindow = 5
+)
 ```
 
 
@@ -2778,11 +2778,12 @@ Can plot on the browser a list of our markerGenes
 
 ```{r}
 # plot every name from the list "motifs"
-motifs_for_co_acc <- motifs[11:20]
+#motifs_for_co_acc <- motifs[56:68]
+#my_markers the ones from RR3
 p <- plotBrowserTrack(
     ArchRProj = projMulti4, 
     groupBy = "CellType_Condition", 
-    geneSymbol = motifs_for_co_acc, #specify motifs to plot here
+    geneSymbol = my_markers, #specify motifs to plot here
     upstream = 50000,
     downstream = 50000,
     loops = getCoAccessibility(projMulti4)
@@ -2800,9 +2801,9 @@ p <- plotBrowserTrack(
 ```{r}
 #to save
 plotPDF(plotList = p, 
-    name = "Plot-Tracks-Marker-Genes-with-CoAccessibility11_20.pdf", 
+    name = "Plot-Tracks-Marker-Genes-with-CoAccessibility_RR3.pdf", 
     ArchRProj = projMulti4, 
-    addDOC = FALSE, width = 5, height = 5)
+    addDOC = FALSE, width = 7, height = 9)
 rm(p)
 ```
 
