@@ -221,8 +221,8 @@ plotPDF(p_frags, p_TSS, p_multi_frags, name = "QC-sample", addDOC = FALSE)
 rm(p_frags, p_multi_frags, p_TSS)
 ```
 
-## Create subgroups by condition
 
+## Create subgroups by condition
 
 ```{r}
 #adding conditions Flight vs Ground as a CellColData
@@ -260,6 +260,7 @@ condition_table <- as.data.frame(condition_table)
 condition_table <- setnames(condition_table, c("Condition", "nCells"))
 condition_table
 ```
+
 
 ```{r}
 p_cond <- ggplot(condition_table,                                 
@@ -363,15 +364,15 @@ filter_df <- as.data.frame(cbind(Sample = c("CF1", "CF2", "CF7", "CG8", "CG9"),
 super_frame <- rbind(condition_sample, condition_after_filter)
 super_frame$filter = factor(super_frame$filter, levels = c("before", "after"), ordered = TRUE)
 
-
 p_before_after <- ggplot(super_frame,
                          aes(x=Sample,
                              y=nCells,
                              fill=filter)) + 
-    geom_bar(position = "dodge", stat="identity", width=1) +
+    geom_bar(position = "dodge", stat="identity", width=0.9) +
     ggtitle("Sample before-after Quality Control") +
-    theme(legend.position="bottom")
-    theme_ipsum()
+    theme(legend.position="right") +
+    theme_minimal() +
+    scale_fill_manual(values=c("#5ec962", "#3b528b"))
 
 p_before_after
 
@@ -382,7 +383,7 @@ write.csv(super_frame, "/Users/raphaelmauron/masters_project/doc/archr_multi/df_
 
 ```{r}
 #save plot
-plotPDF(p_before_after, name = "Sample-before-after-QC",ArchRProj = projMulti2, addDOC = FALSE)
+plotPDF(p_before_after, name = "Sample-before-after-QC", ArchRProj = projMulti2, addDOC = FALSE)
 rm(p_before_after)
 ```
 
@@ -1591,6 +1592,7 @@ p_sample <- ggplot(df,
   ggtitle("Number of cells per condition and per sample") +
     theme(axis.text.x = element_text(angle = 60, hjust=1)) +
     theme(legend.position="bottom") +
+    theme_minimal() +
     scale_fill_viridis_d()
 
 
