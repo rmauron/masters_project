@@ -2138,6 +2138,8 @@ write.csv(marker_up_enrichr, "/Users/raphaelmauron/masters_project/doc/archr_mul
 
 write.csv(marker_down_enrichr, "/Users/raphaelmauron/masters_project/doc/archr_multi/marker_down_enrichr.csv", row.names=T)
 
+#do the same for down
+
 ```
 
 
