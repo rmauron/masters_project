@@ -15,3 +15,5 @@ Plots
 df_top3_markergenes.csv
 df_nCells_before_after.csv
 metrics.csv
+marker_up_enrichr.csv
+marker_down_enrichr.csv
