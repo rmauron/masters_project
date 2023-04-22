@@ -2099,6 +2099,49 @@ rm(i, top5)
 ```
 
 
+```{r}
+marker_up_enrichr <- data.frame()
+marker_down_enrichr <- data.frame()
+row_names <- c()
+i <- 1
+for (i in seq_along(df_motifsUp)) {
+    topUP30 <- df_motifsUp[[i]][["TF"]][1:30]
+    topUP30 <- gsub("_.*", "", topUP30) #remove the characters after the "_" in order to make them compatible for the rest of the code,
+    marker_up_enrichr <- rbind(marker_up_enrichr, topUP30)
+    row_names <- append(row_names,  paste("Cluster", as.character(i)))
+}
+
+i <- 1
+for (i in seq_along(df_motifsUp)) {
+    topDO30 <- df_motifsDo[[i]][["TF"]][1:30]
+    topDO30 <- gsub("_.*", "", topDO30) #remove the characters after the "_" in order to make them compatible for the rest of the code,
+    marker_down_enrichr <- rbind(marker_down_enrichr, topDO30)
+}
+
+i <- 1
+my_col_names <- c()
+for (i in 1:length(topUP30)) {
+    my_col_names <- append(my_col_names, paste("Motif", as.character(i)))
+}
+
+rownames(marker_up_enrichr) <- row_names
+colnames(marker_up_enrichr) <- my_col_names
+
+rownames(marker_down_enrichr) <- row_names
+colnames(marker_down_enrichr) <- my_col_names
+
+marker_up_enrichr
+marker_down_enrichr
+
+# Export dataframe as csv (for report)
+write.csv(marker_up_enrichr, "/Users/raphaelmauron/masters_project/doc/archr_multi/marker_up_enrichr.csv", row.names=T)
+
+write.csv(marker_down_enrichr, "/Users/raphaelmauron/masters_project/doc/archr_multi/marker_down_enrichr.csv", row.names=T)
+
+```
+
+
+
 ### MotifsUp and down among all the clusters
 ```{r}
 #| message: false
