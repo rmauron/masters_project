@@ -269,6 +269,7 @@ p_cond <- ggplot(condition_table,
   geom_bar(stat = "identity")+
   ggtitle("Number of cells per condition")
 #p_cond
+rm(condition_table)
 ```
 
 
@@ -374,10 +375,10 @@ p_before_after <- ggplot(super_frame,
     theme_minimal() +
     scale_fill_manual(values=c("#5ec962", "#3b528b"))
 
-p_before_after
-
 # Export dataframe as csv (for report)
 write.csv(super_frame, "/Users/raphaelmauron/masters_project/doc/archr_multi/df_nCells_before_after.csv", row.names=T)
+
+rm(condition_after_filter, filter_diff, filter_df, super_frame, condition_sample)
 ```
 
 
@@ -1554,8 +1555,7 @@ p_cond <- ggplot(df_cond_cell,
   ggtitle("Number of cells per condition") +
     theme(axis.text.x = element_text(angle = 60, hjust=1))+
     theme(legend.position="bottom")
-
-p_cond #+ coord_fixed(ratio = 0.3) #new
+rm(df_cond_cell)
 ```
 
 
@@ -1581,30 +1581,28 @@ df <- df %>%
     ))
 
 df
+
+rm(sample, sample_list)
 ```
+
 
 ```{r}
 p_sample <- ggplot(df,                                 
        aes(x = Samples,
            y = nCells,
            fill = Condition)) + #new Sample
-  geom_bar(postition = "stack", stat = "identity")+
+  geom_bar(position = "stack", stat = "identity")+
   ggtitle("Number of cells per condition and per sample") +
     theme(axis.text.x = element_text(angle = 60, hjust=1)) +
     theme(legend.position="bottom") +
     theme_minimal() +
     scale_fill_viridis_d()
-
-
-p_sample #+ coord_fixed(ratio = 0.001) #new
+rm(df)
 ```
 
 
 ```{r}
-p_comb <- ggarrange(p_cond, p_sample, ncol = 2,nrow = 1) #labels = c("A", "B"))
-        # Label of the line plot
-   
-p_comb
+p_comb <- ggarrange(p_cond, p_sample, ncol = 2,nrow = 1)
 ```
 
 
@@ -1616,7 +1614,7 @@ plotPDF(p_cond, p_sample, p_comb,
         addDOC = FALSE,
         width = 25,
         height = 10)
-#rm(p_cond)
+rm(p_cond, p_sample, p_comb)
 ```
 
 
@@ -1706,6 +1704,8 @@ metrics
 
 # Export dataframe as csv (for report)
 write.csv(metrics, "/Users/raphaelmauron/masters_project/doc/archr_multi/metrics.csv", row.names=T)
+
+rm(i, metrics, my_table, matches)
 ```
 
 
@@ -1835,7 +1835,7 @@ for (i in 1:length(useGroups_list)) {
     
     i <- i+1
 }
-rm(plot_type, nam_significant, nam, i, pv)
+rm(plot_type, nam_significant, nam, i, pv, useGroups_list)
 ```
 
 
@@ -2073,7 +2073,7 @@ for (i in seq_along(markerTest)) {
     
 }
 
-rm(i, plot_type, up, down)
+rm(i, plot_type, up, down, df_Up, df_Do, ggUp, ggDo, motifsDo, motifsUp)
 ```
 
 
@@ -2091,7 +2091,6 @@ for (i in seq_along(df_motifsDo)) {
     top5 <- gsub("_.*", "", top5) #remove the characters after the "_" in order to make them compatible for the rest of the code,
     marker_motifs_top5 <- append(marker_motifs_top5, top5)
 }
-
 
 marker_motifs_top5 <- unique(marker_motifs_top5)
 print(marker_motifs_top5)
@@ -2130,16 +2129,12 @@ colnames(marker_up_enrichr) <- my_col_names
 rownames(marker_down_enrichr) <- row_names
 colnames(marker_down_enrichr) <- my_col_names
 
-marker_up_enrichr
-marker_down_enrichr
-
 # Export dataframe as csv (for report)
 write.csv(marker_up_enrichr, "/Users/raphaelmauron/masters_project/doc/archr_multi/marker_up_enrichr.csv", row.names=T)
 
 write.csv(marker_down_enrichr, "/Users/raphaelmauron/masters_project/doc/archr_multi/marker_down_enrichr.csv", row.names=T)
 
-#do the same for down
-
+rm(i, topUP30, topDO30, marker_up_enrichr, marker_down_enrichr, row_names, my_col_names)
 ```
 
 
@@ -2386,8 +2381,8 @@ for (i in 1:length(useGroups_list)) {
     chromVAR_top25_up[[i]] <-  head(rankedmotif,25) #first 25 rows
     chromVAR_top25_do[[i]] <- tail(rankedmotif,25) #last 25 rows
     
-    #get the absolute top5 variable motifs per cluster to keep as motif
-    absolute_ranked <- rankedmotif[order(abs(rankedmotif$MeanDiff), decreasing = T),] #order the dataframe by absolute value of MeanDiff
+    #get the top10 to keep as motif
+    absolute_ranked <- rankedmotif
     absolute_ranked_top <- head(absolute_ranked["name"],10) 
     absolute_ranked_top <- cbind(absolute_ranked_top, useGroups_list[i])
     colnames(absolute_ranked_top)[2] <- "cell_origin"
@@ -2396,13 +2391,76 @@ for (i in 1:length(useGroups_list)) {
     
     i <- i+1
 }
-rm(i, diffmotif, rankedmotif)
+rm(i, diffmotif, rankedmotif, useGroups_list, bgdGroups_list, chromVAR_condition, absolute_ranked, absolute_ranked_top)
 ```
+
+
+```{r}
+marker_up_CV_enrichr <- data.frame()
+marker_down_CV_enrichr <- data.frame()
+row_names <- c()
+i <- 1
+for (i in seq_along(chromVAR_top25_up)) {
+    topUP30 <- chromVAR_top25_up[[i]][["name"]][1:25]
+    topUP30 <- gsub("_.*", "", topUP30) #remove the characters after the "_" in order to make them compatible for the rest of the code,
+    marker_up_CV_enrichr <- rbind(marker_up_CV_enrichr, topUP30)
+    row_names <- append(row_names,  paste("Cluster", as.character(i)))
+}
+
+i <- 1
+for (i in seq_along(chromVAR_top25_up)) {
+    topDO30 <- chromVAR_top25_do[[i]][["name"]][1:25]
+    topDO30 <- gsub("_.*", "", topDO30) #remove the characters after the "_" in order to make them compatible for the rest of the code,
+    marker_down_CV_enrichr <- rbind(marker_down_CV_enrichr, topDO30)
+}
+
+i <- 1
+my_col_names <- c()
+for (i in 1:length(topUP30)) {
+    my_col_names <- append(my_col_names, paste("Motif", as.character(i)))
+}
+
+rownames(marker_up_CV_enrichr) <- row_names
+colnames(marker_up_CV_enrichr) <- my_col_names
+
+rownames(marker_down_CV_enrichr) <- row_names
+colnames(marker_down_CV_enrichr) <- my_col_names
+
+# Export dataframe as csv (for report)
+write.csv(marker_up_CV_enrichr, "/Users/raphaelmauron/masters_project/doc/archr_multi/marker_up_CV_enrichr.csv", row.names=T)
+
+write.csv(marker_down_CV_enrichr, "/Users/raphaelmauron/masters_project/doc/archr_multi/marker_down_CV_enrichr.csv", row.names=T)
+
+rm(i, topUP30, topDO30, marker_up_CV_enrichr, marker_down_CV_enrichr, row_names, my_col_names, chromVAR_top25_up, chromVAR)
+```
+
+
+```{r}
+chromVAR_top_abs$name <- gsub("_.*", "", chromVAR_top_abs$name)
+chromVAR_top_abs$cell_origin <- gsub("_x_CF", "", chromVAR_top_abs$cell_origin)
+split_df <- split(chromVAR_top_abs, chromVAR_top_abs$cell_origin)
+
+new_cols <- lapply(split_df, function(df) {
+  names_vec <- as.character(df$name)
+  new_col <- setNames(names_vec, df$cell_origin[1])
+  return(new_col)
+})
+
+# combine the new columns into a single dataframe
+new_df <- as.data.frame(new_cols)
+
+write.csv(new_df, "/Users/raphaelmauron/masters_project/doc/archr_multi/abs_top10_CV_markers.csv", row.names=T)
+
+rm(split_df, new_cols, new_df, n)
+```
+
+
 
 Since the same motifs can appear in different cell type, create a list of unique motifs for further analysis
 ```{r}
 chromVAR_top_abs_unique <- unique(chromVAR_top_abs$name)
 chromVAR_top_abs_unique <- sub("_.*", "", chromVAR_top_abs_unique)
+rm(chromVAR_top_abs)
 ```
 
 
@@ -2415,6 +2473,7 @@ chromVAR_top_abs_unique <- sub("_.*", "", chromVAR_top_abs_unique)
 motifs <- chromVAR_top_abs_unique
 markerMotifs <- getFeatures(projMulti4, select = paste(motifs, collapse="|"), useMatrix = "MotifMatrix")
 markerMotifs
+rm(chromVAR_top_abs_unique)
 ```
 
 
