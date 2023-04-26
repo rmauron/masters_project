@@ -2431,7 +2431,27 @@ write.csv(marker_up_CV_enrichr, "/Users/raphaelmauron/masters_project/doc/archr_
 
 write.csv(marker_down_CV_enrichr, "/Users/raphaelmauron/masters_project/doc/archr_multi/marker_down_CV_enrichr.csv", row.names=T)
 
-rm(i, topUP30, topDO30, marker_up_CV_enrichr, marker_down_CV_enrichr, row_names, my_col_names, chromVAR_top25_up, chromVAR)
+rm(i, topUP30, topDO30, marker_up_CV_enrichr, row_names, my_col_names, chromVAR_top25_up, chromVAR_top25_do)
+```
+
+
+## Motifs from chromVAR from only the 4 celltypes of interest
+```{r}
+marker_4_table <- marker_down_CV_enrichr[c("Cluster 1", "Cluster 2", "Cluster 8", "Cluster 9"), ]
+
+new_df <- as.data.frame(t(marker_4_table))
+new_df <- head(new_df,20)
+new_df
+write.csv(new_df, "/Users/raphaelmauron/masters_project/doc/archr_multi/marker_down_CV_enrichr_4_clusters.csv", row.names=T)
+
+marker_4_clusters <- c()
+for (i in 1:4) {
+    marker_4_clusters <- append(marker_4_clusters, new_df[,i])
+}
+marker_4_clusters <- sort(unique(marker_4_clusters))
+marker_4_clusters
+
+rm(i, new_df)
 ```
 
 
@@ -2460,7 +2480,6 @@ Since the same motifs can appear in different cell type, create a list of unique
 ```{r}
 chromVAR_top_abs_unique <- unique(chromVAR_top_abs$name)
 chromVAR_top_abs_unique <- sub("_.*", "", chromVAR_top_abs_unique)
-rm(chromVAR_top_abs)
 ```
 
 
@@ -2470,7 +2489,7 @@ rm(chromVAR_top_abs)
 #to analyze subset of features
 # motifs <- c() #instead of using "my_markers" you can specify another list here
 ### maybe take the marker_motifs_top5
-motifs <- chromVAR_top_abs_unique
+motifs <- marker_4_clusters
 markerMotifs <- getFeatures(projMulti4, select = paste(motifs, collapse="|"), useMatrix = "MotifMatrix")
 markerMotifs
 rm(chromVAR_top_abs_unique)
@@ -2531,7 +2550,7 @@ p2 <- lapply(seq_along(p), function(x){
 ```{r}
 #save plot
 plotPDF(p, name = "Plot-Groups-Conditions-Deviations-w-Imputation", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
-rm(p)
+rm(p, p2)
 ```
 
 
@@ -2571,7 +2590,7 @@ p2 <- lapply(p, function(x){
 ```{r}
 #save plot
 plotPDF(p, name = "Plot-Groups-Deviations-w-Z-score-embedding", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
-rm(p)
+rm(p, p2)
 ```
 
 
@@ -2622,7 +2641,7 @@ p2 <- lapply(p, function(x){
 ```{r}
 #save plot
 plotPDF(p, name = "Plot-Groups-Deviations-w-GeneExpression-embedding", width = 5, height = 5, ArchRProj = projMulti4, addDOC = FALSE)
-rm(p)
+rm(p, p2)
 ```
 
 
@@ -2679,7 +2698,7 @@ plotPDF(plotList = p,
     name = "Plot-Groups-Deviations-w-linked-gene-expression-of-TF-embedding.pdf", 
     ArchRProj = projMulti4, 
     addDOC = FALSE, width = 5, height = 5)
-rm(p)
+rm(p, p2)
 ```
 
 
@@ -2710,8 +2729,8 @@ motifPositions
 # motifs <- c() #specify another motifs list here if want others than my_markers
 
 markerMotifs <- unlist(lapply(motifs, function(x) grep(x, names(motifPositions), value = TRUE)))
-#markerMotifs <- markerMotifs[markerMotifs %ni% "SREBF1_22"] #can exclude motifs here
-markerMotifs <- markerMotifs[markerMotifs %in% unique(chromVAR_top_abs$name)]
+markerMotifs <- markerMotifs[markerMotifs %ni% c("Bhlha15_87", "Ctcf_146",           "Ctcfl_820", "Foxd4_833", "Foxl1_354", "Foxl1_355", "Foxl1_356", "Foxl1_357",        "Foxl1_358", "Foxl1_359", "Foxl1_360", "Foxl1_361", "Foxl1_362", "Foxl1_363", "Foxl1_364", "Foxl1_365", "Foxl1_366", "Foxl1_367", "Foxl1_368", "Foxl1_369", "Foxl1_370", "Foxl1_371", "Foxl1_372", "Foxl1_373", "Foxl1_374", "Foxl1_375", "Foxl1_376", "Foxl1_377", "Foxl1_378", "Foxl1_379", "Foxl1_380", "Foxl1_381", "Gm5294_331", "Gm5294_332", "Gm5294_333", "Gm5294_334", "Gm5294_335", "Gm5294_336", "Gm5294_337", "Gm5294_338", "Gm5294_339", "Gm5294_340", "Gm5294_341", "Gm5294_342", "Gm5294_343", "Gm5294_344", "Gm5294_345", "Gm5294_346", "Gm5294_347", "Gm5294_348", "Gm5294_349", "Gm5294_350", "Gm5294_351", "Gm5294_352", "Gm5294_353", "Gm5294", "Jund_135", "Mesp1_58", "Mesp2_57", "Nfia_862", "Nfic_724", "Tcf4_88", "X9430076C15Rik_128", "Zeb1_139", "Zfp105_218")] #those motifs were removed because no connection with neuronal function after UniProt check
+#markerMotifs <- markerMotifs[markerMotifs %in% chromVAR_ranked[[1]][["name"]]]
 markerMotifs
 ```
 
@@ -2723,7 +2742,16 @@ markerMotifs
 seFoot <- getFootprints(
   ArchRProj = projMulti4, 
   positions = motifPositions[markerMotifs], #specify the subset of motifs
-  groupBy = "CellType_Condition"
+  groupBy = "CellType_Condition",
+  useGroups = c("Astroependymal_cells_x_CF", 
+                "Astroependymal_cells_x_CG",
+                "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CF",
+                "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CG",
+                "Telencephalon_interneurons_x_CF",
+                "Telencephalon_interneurons_x_CG",
+                "Telencephalon_projecting_neurons_x_CF",
+                "Telencephalon_projecting_neurons_x_CG"
+                ) #groups from "groupBy" to keep for the footprinting
 )
 ```
 
@@ -2888,11 +2916,20 @@ Can plot on the browser a list of our markerGenes
 #my_markers the ones from RR3
 p <- plotBrowserTrack(
     ArchRProj = projMulti4, 
-    groupBy = "CellType_Condition", 
-    geneSymbol = my_markers, #specify motifs to plot here
+    geneSymbol = c(my_markers, motifs), #specify motifs to plot here
     upstream = 50000,
     downstream = 50000,
-    loops = getCoAccessibility(projMulti4)
+    loops = getCoAccessibility(projMulti4),
+    groupBy = "CellType_Condition",
+    useGroups = c("Astroependymal_cells_x_CF", 
+                "Astroependymal_cells_x_CG",
+                "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CF",
+                "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CG",
+                "Telencephalon_interneurons_x_CF",
+                "Telencephalon_interneurons_x_CG",
+                "Telencephalon_projecting_neurons_x_CF",
+                "Telencephalon_projecting_neurons_x_CG"
+                ) #groups from "groupBy" to keep for the footprinting
 )
 ```
 
@@ -2907,9 +2944,9 @@ p <- plotBrowserTrack(
 ```{r}
 #to save
 plotPDF(plotList = p, 
-    name = "Plot-Tracks-Marker-Genes-with-CoAccessibility_RR3.pdf", 
+    name = "Plot-Tracks-Marker-Genes-with-CoAccessibility.pdf", 
     ArchRProj = projMulti4, 
-    addDOC = FALSE, width = 7, height = 9)
+    addDOC = FALSE, width = 7, height = 5)
 rm(p)
 ```
 
@@ -2931,8 +2968,17 @@ Identify "peak to gene links" (done in chapter ("Calling Peaks (point 9 & 10 in 
 
 p <- plotBrowserTrack(
     ArchRProj = projMulti4, 
-    groupBy = "CellType_Condition", 
-    geneSymbol = markerGenes, 
+    groupBy = "CellType_Condition",
+    useGroups = c("Astroependymal_cells_x_CF", 
+                "Astroependymal_cells_x_CG",
+                "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CF",
+                "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CG",
+                "Telencephalon_interneurons_x_CF",
+                "Telencephalon_interneurons_x_CG",
+                "Telencephalon_projecting_neurons_x_CF",
+                "Telencephalon_projecting_neurons_x_CG"
+                ), #groups from "groupBy" to keep for the footprinting 
+    geneSymbol = c(my_markers, motifs) ,#markerGenes, 
     upstream = 50000,
     downstream = 50000,
     loops = getPeak2GeneLinks(projMulti4) #the links were stored in projMulti4
@@ -2972,7 +3018,17 @@ To visualize the correspondence of all of our **peak-to-gene links**, we can plo
 #| warning: false
 
 p <- plotPeak2GeneHeatmap(ArchRProj = projMulti4, 
-                          groupBy = "CellType_Condition")
+                  groupBy = "CellType_Condition"
+                  # useGroups = c("Astroependymal_cells_x_CF", 
+                  #               "Astroependymal_cells_x_CG",
+                  #               "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CF",
+                  #               "Cholinergic,_monoaminergic_and_peptidergic_neurons_x_CG",
+                  #               "Telencephalon_interneurons_x_CF",
+                  #               "Telencephalon_interneurons_x_CG",
+                  #               "Telencephalon_projecting_neurons_x_CF",
+                  #               "Telencephalon_projecting_neurons_x_CG"
+                  #               ) #groups from "groupBy" to keep for the footprinting)
+)
 ```
 
 
