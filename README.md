@@ -1,34 +1,16 @@
-TODO: Add more to the title of your project here
+# Master's Thesis Project
+During my masters thesis project I worked with a **single-nuclei ATAC-sequencing dataset** in order to better understand the chromatin dynamics of mouse brain behavior in response to spaceflight experiment.
+A multiomic dataset was available with both RNA-seq and ATAC-seq from the same nuclei. In order to better leverage what was happening, I needed a performant tool which focused on ATAC data but which could also incorporate RNA-seq.
+I used [ArchR](https://github.com/GreenleafLab/ArchR) which is one of the most updated and performant R-based tool for single-cell ATAC-seq analysis. I don't intend to sell the software but however recommend to read the [documentation](https://www.archrproject.com/) before use.
 
-# masters_project:
+## Context
+The investigation focused on analyzing the behavior of the mouse brain in the context of spaceflight. Notably, intriguing changes resembling neurodegenerative alterations were observed.
 
-TODO: Give a brief description of what your project is about
+## Code availability
+The finalized script utilized for generating the presented results can be accessed in the **archr_multi** folder under ```doc > archr_multi > archr_multiome.qmd```
 
-This project...
+## Reproducibility
+Reproducibility of the analysis necessitates a specific version of ```ggplot2``` (version 3.3.6) within the ArchR framework as well as a Python tool, ```MACS2```, which may be inconvenient for some users. To address this concern, a Singularity container is provided on the corresponding [GitHub page](https://github.com/rmauron/Singularity/tree/main/ArchR), accompanied by basic instructions on employing ```Singularity```, accessible [here](https://github.com/rmauron/Singularity/tree/main).
 
-# Brief description of folder and file contents
-
-TODO: As project evolves, add brief description of what is inside the data, doc and R folders.
-
-The following folders contain:
-
-- `data/`:
-- `doc/`:
-- `R/`:
-
-# Installing project R package dependencies
-
-If dependencies have been managed by using `usethis::use_package("packagename")`
-through the `DESCRIPTION` file, installing dependencies is as easy as opening the
-`masters_project.Rproj` file and running this command in the console:
-
-    # install.packages("remotes")
-    remotes::install_deps()
-
-You'll need to have remotes installed for this to work.
-
-# Resource
-
-For more information on this folder and file workflow and setup, check
-out the [prodigenr](https://rostools.github.io/prodigenr) online
-documentation.
+## Written Thesis
+The written report detailing the findings of this study will soon be published by **KTH**. The link to access the thesis will be made available in due course.
