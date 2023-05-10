@@ -1,4 +1,4 @@
-# Master's Thesis Project
+# Chromatin accessibility analysis of spaceflight mouse brains using ArchR
 During my masters thesis project I worked with a **single-nuclei ATAC-sequencing dataset** in order to better understand the chromatin dynamics of mouse brain behavior in response to spaceflight experiment.
 A multiomic dataset was available with both RNA-seq and ATAC-seq from the same nuclei. In order to better leverage what was happening, I needed a performant tool which focused on ATAC data but which could also incorporate RNA-seq.
 I used [ArchR](https://github.com/GreenleafLab/ArchR) which is one of the most updated and performant R-based tool for single-cell ATAC-seq analysis. I don't intend to sell the software but however recommend to read the [documentation](https://www.archrproject.com/) before use.
