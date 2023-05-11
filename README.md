@@ -7,7 +7,8 @@ I used [ArchR](https://github.com/GreenleafLab/ArchR) which is one of the most u
 The investigation focused on analyzing the behavior of the mouse brain in the context of spaceflight. Notably, intriguing changes resembling neurodegenerative alterations were observed.
 
 ## Code availability
-The finalized [script](https://github.com/rmauron/masters_project/blob/main/doc/archr_multi/archr_multiome.qmd) utilized for generating the presented results can be accessed in the **archr_multi** folder under ```doc > archr_multi > archr_multiome.qmd```
+The finalized [Quarto script](https://github.com/rmauron/masters_project/blob/main/doc/archr_multi/archr_multiome.qmd) utilized for generating the presented results can be accessed in the **archr_multi** folder under ```doc > archr_multi > archr_multiome.qmd```.
+The exact same code is available as [R script](https://github.com/rmauron/masters_project/blob/main/archr_multiome.R) if necessary.
 
 ## Reproducibility
 Reproducibility of the analysis necessitates a specific version of ```ggplot2``` (version 3.3.6) within the ArchR framework as well as a Python tool, ```MACS2```, which may be inconvenient for some users. To address this concern, a Singularity container is provided on the corresponding [GitHub page](https://github.com/rmauron/Singularity/tree/main/ArchR), accompanied by basic instructions on employing ```Singularity```, accessible [here](https://github.com/rmauron/Singularity/tree/main).
