@@ -1327,7 +1327,7 @@ for (i in 1:length(useGroups_list)) {
 
     i <- i+1
 }
-rm(plot_type, nam_significant, nam, i, pv, useGroups_list)
+rm(plot_type, nam_significant, nam, i, pv)
 
 
 #indentify marker peaks by calling addMarkerFeatures()
